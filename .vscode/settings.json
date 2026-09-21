@@ -1,0 +1,9 @@
+{
+    "actions": [
+        {
+            "id": "openReadmeFile",
+            "actionType": "FILE",
+            "uri": "file:///home/user/projects/ai-enablement-dashboard/.gen/generation.log"
+        }
+    ]
+}

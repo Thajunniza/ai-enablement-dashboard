@@ -1,0 +1,31 @@
+{
+  "xsappname": "ai-enablement-dashboard",
+  "tenant-mode": "dedicated",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.dashboard:view",
+      "description": "View dashboard metrics and trends"
+    },
+    {
+      "name": "$XSAPPNAME.dashboard:admin",
+      "description": "Admin access to dashboard data and exports"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "DashboardViewer",
+      "description": "Read-only dashboard access",
+      "scope-references": [
+        "$XSAPPNAME.dashboard:view"
+      ]
+    },
+    {
+      "name": "DashboardAdmin",
+      "description": "Full dashboard administration",
+      "scope-references": [
+        "$XSAPPNAME.dashboard:view",
+        "$XSAPPNAME.dashboard:admin"
+      ]
+    }
+  ]
+}

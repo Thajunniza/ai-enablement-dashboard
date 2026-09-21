@@ -1,0 +1,142 @@
+_schema-version: "3.3.0"
+ID: ai-enablement-dashboard
+version: 1.0.0
+
+description: AI Enablement Dashboard
+
+parameters:
+  enable-parallel-deployments: true
+  deploy_mode: html5-repo
+
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production
+
+modules:
+
+  # ------------------------------------------------------------
+  # CAP Backend
+  # ------------------------------------------------------------
+
+  - name: ai-enablement-dashboard-srv
+    type: nodejs
+    path: gen/srv
+
+    parameters:
+      instances: 1
+      memory: 512M
+      disk-quota: 512M
+      buildpack: nodejs_buildpack
+
+    build-parameters:
+      builder: npm-ci
+
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+
+    requires:
+      - name: ai-enablement-dashboard-auth
+      - name: ai-enablement-dashboard-postgres
+      - name: ai-enablement-dashboard-destination
+
+  # ------------------------------------------------------------
+  # PostgreSQL Deployer
+  # ------------------------------------------------------------
+
+  - name: ai-enablement-dashboard-postgres-deployer
+    type: nodejs
+    path: gen/pg
+
+    parameters:
+      buildpack: nodejs_buildpack
+      no-route: true
+      no-start: true
+
+    tasks:
+      - name: deploy-to-postgresql
+        command: npm start
+
+    requires:
+      - name: ai-enablement-dashboard-postgres
+
+  # ------------------------------------------------------------
+  # HTML5 Content Deployer
+  # ------------------------------------------------------------
+
+  - name: ai-enablement-dashboard-app-deployer
+    type: com.sap.application.content
+    path: gen
+
+    build-parameters:
+      build-result: app/
+
+    requires:
+      - name: ai-enablement-dashboard-auth
+
+      - name: srv-api
+
+      - name: ai-enablement-dashboard-html5-repo-host
+        parameters:
+          content-target: true
+
+resources:
+
+  # ------------------------------------------------------------
+  # EXISTING PostgreSQL SERVICE
+  # (Already created manually in BTP)
+  # ------------------------------------------------------------
+
+  - name: ai-enablement-dashboard-postgres
+    type: org.cloudfoundry.existing-service
+
+  # ------------------------------------------------------------
+  # XSUAA
+  # Managed by MTA
+  # ------------------------------------------------------------
+
+  - name: ai-enablement-dashboard-auth
+    type: org.cloudfoundry.managed-service
+
+    parameters:
+      service: xsuaa
+      service-plan: application
+
+      path: ./xs-security.json
+
+      config:
+        xsappname: ai-enablement-dashboard-${org}-${space}
+        tenant-mode: dedicated
+
+        oauth2-configuration:
+          credential-types:
+            - binding-secret
+            - x509
+
+  # ------------------------------------------------------------
+  # Destination Service
+  # Managed by MTA
+  # ------------------------------------------------------------
+
+  - name: ai-enablement-dashboard-destination
+    type: org.cloudfoundry.managed-service
+
+    parameters:
+      service: destination
+      service-plan: lite
+
+  # ------------------------------------------------------------
+  # HTML5 Repo Host
+  # Managed by MTA
+  # ------------------------------------------------------------
+
+  - name: ai-enablement-dashboard-html5-repo-host
+    type: org.cloudfoundry.managed-service
+
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host
