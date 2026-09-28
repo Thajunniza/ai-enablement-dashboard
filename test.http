@@ -1,0 +1,27 @@
+@host = http://localhost:4004
+
+### 1. Check current Person state (baseline from seed CSV)
+GET {{host}}/dashboard/Persons
+
+### 2. Trigger J4C user sync
+POST {{host}}/admin/syncJ4CUsers
+Content-Type: application/json
+
+{}
+
+### 3. Check Person state after sync
+# Expect: Alice Chen created, Bin Jiang refreshed, Robert Maloney active:false (not deleted)
+GET {{host}}/dashboard/Persons
+
+### 4. Run sync again - should be idempotent
+# Expect: created:0, reactivated:0, refreshed:2, deactivated:0
+POST {{host}}/admin/syncJ4CUsers
+Content-Type: application/json
+
+{}
+
+### 5. Check Person state after second sync (only lastSeenAt should move)
+GET {{host}}/dashboard/Persons
+
+### 6. Check Initiatives too, once enabledUsers is wired up
+GET {{host}}/dashboard/Initiatives

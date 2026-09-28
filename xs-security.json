@@ -1,31 +1,37 @@
 {
   "xsappname": "ai-enablement-dashboard",
   "tenant-mode": "dedicated",
+  "description": "AI Enablement Dashboard - authorization scopes and role templates",
   "scopes": [
     {
-      "name": "$XSAPPNAME.dashboard:view",
-      "description": "View dashboard metrics and trends"
+      "name": "$XSAPPNAME.DashboardViewer",
+      "description": "View AI initiative adoption dashboard (masked user details)"
     },
     {
-      "name": "$XSAPPNAME.dashboard:admin",
-      "description": "Admin access to dashboard data and exports"
+      "name": "$XSAPPNAME.DashboardUserDetail",
+      "description": "View real, unmasked names and emails of enabled/active users"
+    },
+    {
+      "name": "$XSAPPNAME.DashboardAdmin",
+      "description": "Trigger manual sync jobs across all initiatives"
     }
   ],
+  "attributes": [],
   "role-templates": [
     {
       "name": "DashboardViewer",
-      "description": "Read-only dashboard access",
-      "scope-references": [
-        "$XSAPPNAME.dashboard:view"
-      ]
+      "description": "Dashboard viewer - masked user data",
+      "scope-references": [ "$XSAPPNAME.DashboardViewer" ]
+    },
+    {
+      "name": "DashboardUserDetail",
+      "description": "Dashboard viewer - real, unmasked user data",
+      "scope-references": [ "$XSAPPNAME.DashboardViewer", "$XSAPPNAME.DashboardUserDetail" ]
     },
     {
       "name": "DashboardAdmin",
-      "description": "Full dashboard administration",
-      "scope-references": [
-        "$XSAPPNAME.dashboard:view",
-        "$XSAPPNAME.dashboard:admin"
-      ]
+      "description": "Can trigger sync jobs, plus full viewing rights",
+      "scope-references": [ "$XSAPPNAME.DashboardViewer", "$XSAPPNAME.DashboardUserDetail", "$XSAPPNAME.DashboardAdmin" ]
     }
   ]
 }
