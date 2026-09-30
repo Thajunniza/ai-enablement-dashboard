@@ -1,45 +1,60 @@
 {
-	"name": "ai-enablement-dashboard",
-	"version": "1.0.0",
-	"dependencies": {
-		"@cap-js/postgres": "^3",
-		"@sap/cds": "^10",
-		"@sap/xssec": "^4"
-	},
-	"devDependencies": {
-		"@cap-js/sqlite": "^3",
-		"@sap/cds-dk": "^10",
-		"@sap/dev-cap-tools": "^1.31.0"
-	},
-	"scripts": {
-		"start": "cds-serve"
-	},
-	"private": true,
-	"cds": {
-		"requires": {
-			"[production]": {
-				"auth": "xsuaa"
-			},
-			"[development]": {
-				"kind": "mocked",
-				"users": {
-					"admin": {
-						"password": "admin",
-						"roles": [
-							"DashboardViewer",
-							"DashboardAdmin"
-						]
-					},
-					"viewer": {
-						"password": "viewer",
-						"roles": [
-							"DashboardViewer"
-						]
-					}
-				}
-			},
-			"destinations": true,
-			"html5-repo": true
-		}
-	}
+  "name": "ai-enablement-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "cds-serve"
+  },
+  "dependencies": {
+    "@cap-js/postgres": "^3",
+    "@sap-cloud-sdk/connectivity": "^4.9.1",
+    "@sap-cloud-sdk/http-client": "^4.9.1",
+    "@sap-cloud-sdk/resilience": "^4.9.1",
+    "@sap/cds": "^10",
+    "@sap/xssec": "^4"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": "^3",
+    "@sap/cds-dk": "^10",
+    "@sap/dev-cap-tools": "^1.31.0"
+  },
+  "cds": {
+    "requires": {
+      "db": {
+        "kind": "postgres",
+        "[production]": {
+          "pool": {
+            "acquireTimeoutMillis": 10000,
+            "max": 10
+          }
+        }
+      },
+      "destinations": true,
+      "html5-repo": true,
+      "IAS_SCIM": {
+        "kind": "rest",
+        "credentials": {
+          "destination": "IAS_SCIM"
+        }
+      },
+      "[production]": {
+        "auth": "xsuaa"
+      },
+      "[development]": {
+        "auth": {
+          "kind": "mocked",
+          "users": {
+            "admin": {
+              "password": "admin",
+              "roles": ["DashboardViewer", "DashboardAdmin"]
+            },
+            "viewer": {
+              "password": "viewer",
+              "roles": ["DashboardViewer"]
+            }
+          }
+        }
+      }
+    }
+  }
 }

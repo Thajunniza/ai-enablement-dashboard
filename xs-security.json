@@ -2,6 +2,7 @@
   "xsappname": "ai-enablement-dashboard",
   "tenant-mode": "dedicated",
   "description": "AI Enablement Dashboard - authorization scopes and role templates",
+  "authorities": ["$ACCEPT_GRANTED_AUTHORITIES"],
   "scopes": [
     {
       "name": "$XSAPPNAME.DashboardViewer",
@@ -9,11 +10,18 @@
     },
     {
       "name": "$XSAPPNAME.DashboardUserDetail",
-      "description": "View real, unmasked names and emails of enabled/active users"
+      "description": "View unmasked names and emails of enabled/active users"
     },
     {
       "name": "$XSAPPNAME.DashboardAdmin",
       "description": "Trigger manual sync jobs across all initiatives"
+    },
+    {
+      "name": "$XSAPPNAME.JobScheduler",
+      "description": "Scope granted to BTP Job Scheduler service instance to invoke sync action endpoints",
+      "grant-as-authority-to-apps": [
+        "$XSSERVICENAME(jobscheduler-test)"
+      ]
     }
   ],
   "attributes": [],
@@ -26,12 +34,24 @@
     {
       "name": "DashboardUserDetail",
       "description": "Dashboard viewer - real, unmasked user data",
-      "scope-references": [ "$XSAPPNAME.DashboardViewer", "$XSAPPNAME.DashboardUserDetail" ]
+      "scope-references": [
+        "$XSAPPNAME.DashboardViewer",
+        "$XSAPPNAME.DashboardUserDetail"
+      ]
     },
     {
       "name": "DashboardAdmin",
       "description": "Can trigger sync jobs, plus full viewing rights",
-      "scope-references": [ "$XSAPPNAME.DashboardViewer", "$XSAPPNAME.DashboardUserDetail", "$XSAPPNAME.DashboardAdmin" ]
+      "scope-references": [
+        "$XSAPPNAME.DashboardViewer",
+        "$XSAPPNAME.DashboardUserDetail",
+        "$XSAPPNAME.DashboardAdmin"
+      ]
+    },
+    {
+      "name": "JobScheduler",
+      "description": "BTP Job Scheduler service role — sync action invocation only",
+      "scope-references": [ "$XSAPPNAME.JobScheduler" ]
     }
   ]
 }

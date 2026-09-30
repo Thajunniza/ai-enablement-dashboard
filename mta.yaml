@@ -29,11 +29,21 @@ modules:
     requires:
       - name: ai-enablement-dashboard-auth
       - name: ai-enablement-dashboard-db
+      - name: ai-enablement-dashboard-jobscheduler
+      - name: ai-enablement-dashboard-destination
 
-  # (html5-apps-repo app-host / app-content / destination-content modules go here
-  #  once you've run `cds add html5-repo` and `cds add destination` - merge their
-  #  generated fragments in rather than me hand-writing them)
-
+  - name: ai-enablement-dashboard-postgres-deployer
+    type: nodejs
+    path: gen/pg
+    parameters:
+      buildpack: nodejs_buildpack
+      no-route: true
+      no-start: true
+      tasks:
+        - name: deploy-to-postgresql
+          command: npm start
+    requires:
+      - name: ai-enablement-dashboard-db
 resources:
   # ---------------------------------------------------------------- XSUAA
   - name: ai-enablement-dashboard-auth
@@ -43,10 +53,21 @@ resources:
       service-plan: application
       path: ./xs-security.json
 
-  # ---------------------------------------------------------------- PostgreSQL (your existing instance)
+  # ---------------------------------------------------------------- PostgreSQL 
   - name: ai-enablement-dashboard-db
     type: org.cloudfoundry.existing-service
     parameters:
       service-name: postgresql-test
 
-  # (html5-apps-repo host + destination service resources go here too, from the same commands)
+  # ---------------------------------------------------------------- Job Scheduling 
+  - name: ai-enablement-dashboard-jobscheduler
+    type: org.cloudfoundry.existing-service
+    parameters:
+      service-name: jobscheduler-test
+  
+  # -------------------------------------------------------
+  - name: ai-enablement-dashboard-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite
