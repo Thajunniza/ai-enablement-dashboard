@@ -1,0 +1,28 @@
+{
+  "generationParameters": {
+    "generationDate": "Fri Oct 02 2026 09:09:43 GMT+0000 (Coordinated Universal Time)",
+    "generatorPlatform": "SAP Business Application Studio",
+    "serviceType": "Local CAP",
+    "metadataFilename": "",
+    "serviceUrl": "http://localhost:4004/dashboard/",
+    "appName": "aiinitiativesoverview",
+    "appTitle": "AI Enablement Dashboard",
+    "appDescription": "AI Enablement Dashboard",
+    "appNamespace": "com.sap",
+    "ui5Theme": "sap_horizon",
+    "ui5Version": "1.153.0",
+    "enableEslint": true,
+    "enableTypeScript": false,
+    "showMockDataInfo": false,
+    "generatorVersion": "1.33.0",
+    "template": "Custom Page V4",
+    "generatorName": "SAP Fiori Application Generator",
+    "entityRelatedConfig": [
+      {
+        "type": "Main Entity",
+        "value": "Initiatives"
+      }
+    ],
+    "launchText": "To launch the generated app, start your CAP project:  and navigate to the following location in your browser:\n\nhttp://localhost:4004/com.sap.aiinitiativesoverview/index.html"
+  }
+}

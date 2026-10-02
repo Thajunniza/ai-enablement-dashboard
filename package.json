@@ -1,9 +1,16 @@
 {
-  "name": "ai-enablement-dashboard",
+  "name": "aiEnablementDashboard",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "cds-serve"
+    "start": "cds-serve",
+    "watch-ai_enablement_dashboard_ui": "cds watch --open ai.enablement.dashboard.aienablementdashboardui/index.html?sap-ui-xx-viewCache=false --livereload false",
+    "undeploy": "cf undeploy aiEnablementDashboard --delete-services --delete-service-keys --delete-service-brokers",
+    "build": "rimraf resources mta_archives && mbt build --mtar archive",
+    "deploy": "cf deploy mta_archives/archive.mtar --retries 1",
+    "watch-ai_initiatives-overview": "cds watch --open com.sap.aiinitiativesoverview/index.html?sap-ui-xx-viewCache=false --livereload false",
+    "watch-project1": "cds watch --open aptiv.com.project1/index.html?sap-ui-xx-viewCache=false --livereload false",
+    "watch-aiinitiativesoverview": "cds watch --open com.sap.aiinitiativesoverview/index.html?sap-ui-xx-viewCache=false --livereload false"
   },
   "dependencies": {
     "@cap-js/postgres": "^3",
@@ -16,13 +23,17 @@
   "devDependencies": {
     "@cap-js/sqlite": "^3",
     "@sap/cds-dk": "^10",
-    "@sap/dev-cap-tools": "^1.31.0"
+    "@sap/dev-cap-tools": "^1.31.0",
+    "cds-plugin-ui5": "^0.17.0",
+    "rimraf": "^5.0.5",
+    "mbt": "^1.2.49"
   },
   "cds": {
     "requires": {
       "db": {
-        "kind": "postgres",
+        "kind": "sqlite",
         "[production]": {
+          "kind": "postgres",
           "pool": {
             "acquireTimeoutMillis": 10000,
             "max": 10
@@ -46,15 +57,29 @@
           "users": {
             "admin": {
               "password": "admin",
-              "roles": ["DashboardViewer", "DashboardAdmin"]
+              "roles": [
+                "DashboardViewer",
+                "DashboardAdmin"
+              ]
             },
             "viewer": {
               "password": "viewer",
-              "roles": ["DashboardViewer"]
+              "roles": [
+                "DashboardViewer"
+              ]
             }
           }
         }
       }
     }
-  }
+  },
+  "workspaces": [
+    "app/*"
+  ],
+  "sapux": [
+    "app/ai_enablement_dashboard_ui",
+    "app/ai_initiatives-overview",
+    "app/project1",
+    "app/aiinitiativesoverview"
+  ]
 }

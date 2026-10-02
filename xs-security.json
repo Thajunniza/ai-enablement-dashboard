@@ -1,5 +1,5 @@
 {
-  "xsappname": "ai-enablement-dashboard",
+  "xsappname": "aiEnablementDashboard",
   "tenant-mode": "dedicated",
   "description": "AI Enablement Dashboard - authorization scopes and role templates",
   "authorities": ["$ACCEPT_GRANTED_AUTHORITIES"],
@@ -18,7 +18,7 @@
     },
     {
       "name": "$XSAPPNAME.JobScheduler",
-      "description": "Scope granted to BTP Job Scheduler service instance to invoke sync action endpoints",
+      "description": "Scope granted to BTP Job Scheduler service instance",
       "grant-as-authority-to-apps": [
         "$XSSERVICENAME(jobscheduler-test)"
       ]
@@ -29,7 +29,7 @@
     {
       "name": "DashboardViewer",
       "description": "Dashboard viewer - masked user data",
-      "scope-references": [ "$XSAPPNAME.DashboardViewer" ]
+      "scope-references": ["$XSAPPNAME.DashboardViewer"]
     },
     {
       "name": "DashboardUserDetail",
@@ -50,8 +50,32 @@
     },
     {
       "name": "JobScheduler",
-      "description": "BTP Job Scheduler service role — sync action invocation only",
-      "scope-references": [ "$XSAPPNAME.JobScheduler" ]
+      "description": "BTP Job Scheduler service role",
+      "scope-references": ["$XSAPPNAME.JobScheduler"]
     }
-  ]
+  ],
+  "role-collections": [
+    {
+      "name": "AI Dashboard Viewer",
+      "description": "View AI initiatives - masked user data",
+      "role-template-references": ["$XSAPPNAME.DashboardViewer"]
+    },
+    {
+      "name": "AI Dashboard User Detail",
+      "description": "View AI initiatives - unmasked user data",
+      "role-template-references": ["$XSAPPNAME.DashboardUserDetail"]
+    },
+    {
+      "name": "AI Dashboard Admin",
+      "description": "Full access including sync job triggers",
+      "role-template-references": ["$XSAPPNAME.DashboardAdmin"]
+    }
+  ],
+  "oauth2-configuration": {
+    "redirect-uris": [
+      "https://*.launchpad.cfapps.us10.hana.ondemand.com/**",
+      "https://*.workzone.cfapps.us10.hana.ondemand.com/**",
+      "https://*.cfapps.us10.hana.ondemand.com/**"
+    ]
+  }
 }

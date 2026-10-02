@@ -4,11 +4,8 @@ using { ai.enablement.dashboard as db } from '../../db/schema';
 service DashboardService {
 
   // @restrict: [ { grant: 'READ', to: 'DashboardViewer' } ]
-  @readonly
-  entity Initiatives as projection on db.Initiative{
-    *,
-    virtual null as enabledUsers : Integer
-  };
+   @readonly
+    entity Initiatives as projection on db.Initiative;
 
   // @restrict: [ { grant: 'READ', to: 'DashboardViewer' } ]
   @readonly

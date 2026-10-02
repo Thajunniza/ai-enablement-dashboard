@@ -1,0 +1,184 @@
+.myNarrowCell {
+    flex: none !important;
+    width: 500px !important; /* or use rem/% as needed */
+}
+
+/* AI Enablement Dashboard — design tokens pinned to the Screen 1 wireframe spec */
+
+/* Header: role pill, top-right of the page header */
+.aiedRolePill {
+    background: #F1F2F4;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: #3A3F46;
+}
+
+/* Card shell */
+/* .aiedCard {
+    border: 1px solid #E2E5E9 !important;
+    border-radius: 12px !important;
+    background: #FFFFFF !important;
+    padding: 24px;
+    box-sizing: border-box;
+} */
+
+/* Coming-soon / not-yet-onboarded card: dimmed + italic title, per wireframe */
+.aiedComingSoonCard {
+    opacity: 0.55;
+}
+.aiedComingSoonCard .aiedCardTitle {
+    font-style: italic;
+}
+
+/* Card title (ObjectIdentifier / Title control, name field) */
+.aiedCardTitle {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1A1A1A;
+}
+
+/* Owner line + "Not yet onboarded" note */
+.aiedCardOwner {
+    font-size: 13px;
+    color: #6B7280;
+}
+
+/* Status badge — pill shape, colored per state.
+   ObjectStatus renders its text in a nested <span class="sapMObjStatusText">,
+   so both the outer control and the inner text span are targeted to make sure
+   the background/color/padding land regardless of DOM nesting. */
+.aiedStatusLive,
+.aiedStatusLive .sapMObjStatusText {
+    background: #E6F4EA !important;
+    color: #1A7F37 !important;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.aiedStatusComingSoon,
+.aiedStatusComingSoon .sapMObjStatusText {
+    background: #F1F2F4 !important;
+    color: #6B7280 !important;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Divider above the Enabled Users KPI */
+.aiedDivider {
+    border-top: 1px solid #F0F1F3;
+    padding-top: 16px;
+    margin-top: 16px;
+}
+
+/* "28" — big blue KPI number */
+.aiedKpiValue {
+    font-size: 36px;
+    font-weight: 700;
+    color: #0057D8;
+}
+
+/* "Synced nightly via SCIM" — small muted note under the KPI label */
+.aiedKpiNote {
+    font-size: 12px;
+    color: #9AA1AB;
+}
+
+/* "View details →" link, bottom-right of the card */
+.aiedViewDetails {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0057D8;
+    text-align: right;
+    display: block;
+}
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* SIDE FILTER PANEL — matches the BTP Service Catalog reference    */
+/* ═══════════════════════════════════════════════════════════════ */
+
+/* Panel shell: white background, right-hand separator from the grid */
+.aiedFilterPanel {
+    background: #FFFFFF;
+    border-right: 1px solid #E2E5E9;
+    padding: 20px 16px;
+    box-sizing: border-box;
+    min-height: 100%;
+}
+
+/* Section labels: "Search Catalog", "Solutions", "Commercial Models", etc. */
+.aiedFilterSectionTitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: #556B82;
+    margin-top: 20px;
+    margin-bottom: 10px;
+    text-transform: none;
+}
+/* First section title sits right under the search field, less top gap */
+.aiedFilterPanel > .aiedFilterSectionTitle:first-of-type {
+    margin-top: 4px;
+}
+
+/* Consistent breathing room below each filter control before the next label */
+.aiedFilterSectionGap {
+    margin-bottom: 4px;
+}
+
+/* Search field */
+.aiedFilterSearch {
+    width: 100%;
+    margin-bottom: 4px;
+}
+.aiedFilterSearch input {
+    border-radius: 6px;
+}
+
+/* Status facet list — borderless rows, selected row gets a left accent bar
+   and light blue fill, matching the "All" row highlighted in the screenshot */
+.aiedFilterStatusList {
+    background: transparent;
+    border: none;
+}
+.aiedFilterStatusList .sapMLIB {
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #3A3F46;
+}
+.aiedFilterStatusList .sapMLIB:hover {
+    background: #F5F6F7;
+}
+/* Selected list item: blue left bar + light blue background + blue text */
+.aiedFilterStatusList .sapMLIBSelected {
+    background: #E8F2FE !important;
+    border-left: 3px solid #0057D8 !important;
+    padding-left: 7px;
+    color: #0057D8 !important;
+    font-weight: 600;
+}
+.aiedFilterStatusList .sapMLIBSelected .sapMSLITitleOnly,
+.aiedFilterStatusList .sapMLIBSelected .sapMObjSLTitle {
+    color: #0057D8 !important;
+    font-weight: 600;
+}
+
+/* Owner dropdown — rounded, neutral border like "All - 6" in the reference */
+.aiedFilterSelect {
+    border: 1px solid #D5D9DD !important;
+    border-radius: 6px !important;
+    background: #FFFFFF;
+}
+
+/* Quick filter chips — outlined pill, filled blue when toggled on */
+.aiedQuickFilterChip .sapMBtnInner.sapMBtnText .sapMBtnIcon::before {
+    font-size: 14px;
+    font-weight: 600
+}
