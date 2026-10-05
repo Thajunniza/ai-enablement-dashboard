@@ -115,6 +115,11 @@
           "name": "InitiativeDetail",
           "pattern": "Initiatives/{initiativeId}",
           "target": "InitiativeDetail"
+        },
+        {
+          "name": "UserDetail",
+          "pattern": "initiatives/{initiativeId}/users/{scimId}",
+          "target": "UserDetailTarget"
         }
       ],
       "targets": {
@@ -147,7 +152,17 @@
               "viewName": "com.sap.aiinitiativesoverview.ext.view.Detail"
             }
           }
+        },
+        "UserDetailTarget": {
+        "type": "Component",
+        "id": "UserDetailTarget",
+        "name": "sap.fe.core.fpm",
+        "options": {
+          "settings": {
+            "viewName": "com.sap.aiinitiativesoverview.ext.view.UserDetail"
+          }
         }
+      }
       }
     }
   },

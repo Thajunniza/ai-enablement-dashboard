@@ -66,6 +66,7 @@ sap.ui.define([
 
             this._loadInitiative(this._sInitiativeId);
             this._loadEnabledUserCount(this._sInitiativeId);
+            this._setMaskingNote();
             this._showEnabledList();     // default list
             this._wireCards();
 
@@ -156,7 +157,7 @@ sap.ui.define([
                 [new Filter("initiative_ID", FilterOperator.EQ, this._sInitiativeId)],
                 undefined,
                 function (o) {
-                    return { scimId: o.scimId, name: that._personName(o), email: o.email, active: !!o.active };
+                    return { name: that._personName(o), email: o.email, active: !!o.active };
                 }
             );
         },
@@ -168,13 +169,12 @@ sap.ui.define([
                 [
                     new Filter("grain", FilterOperator.EQ, sGrain),
                     new Filter("periodLabel", FilterOperator.EQ, sPeriod),
-                    new Filter("person_initiative_ID", FilterOperator.EQ, this._sInitiativeId)
+                    new Filter("person/initiative_ID", FilterOperator.EQ, this._sInitiativeId)
                 ],
                 { $expand: "person" },
                 function (o) {
                     var p = o.person || {};
                     return {
-                        scimId: p.scimId,
                         name: that._personName(p),
                         email: p.email,
                         firstSeen: o.firstSeen,
@@ -328,14 +328,11 @@ sap.ui.define([
         onTrendDeselect: function () {
             var that = this;
             clearTimeout(this._iDeselectTimer);
+            // Replacing one selection with another fires deselect then select;
+            // wait briefly so the follow-up select can cancel this.
             this._iDeselectTimer = setTimeout(function () {
-                var oChart = that.byId("trendChart");
-                var aSel = oChart && oChart.vizSelection ? oChart.vizSelection() : [];
-                if (aSel && aSel.length) {
-                    return;   // a point is still selected, so this was just the old one being replaced
-                }
+                that._showActiveList(that._sGrain, that._latestPeriod());
             }, 150);
-
         },
 
         onNavBack: function () {
@@ -345,15 +342,6 @@ sap.ui.define([
             } else {
                 this.oRouter.navTo("InitiativesMain");
             }
-        },
-
-        onUserPress: function (oEvent) {
-            var oRow = oEvent.getSource().getBindingContext("userListModel").getObject();
-            if (!oRow || !oRow.scimId) { return; }
-            this.oRouter.navTo("UserDetail", {
-                initiativeId: this._sInitiativeId,
-                scimId: oRow.scimId
-            });
         },
         _detail: function () {
             return this.getView().getModel("detailModel");

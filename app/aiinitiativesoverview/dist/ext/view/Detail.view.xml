@@ -270,7 +270,7 @@
                             </Column>
                         </columns>
                         <items>
-                            <ColumnListItem id="userListItem" type="Navigation" press=".onUserPress">
+                            <ColumnListItem id="userListItem">
                                 <cells>
                                     <HBox id="cellNameBox" alignItems="Center">
                                         <Avatar

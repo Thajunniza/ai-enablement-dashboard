@@ -4,3 +4,13 @@ scim-usr-0002,10000000-0000-0000-0000-000000000001,usr0002@test.invalid,User,Zer
 scim-usr-0003,10000000-0000-0000-0000-000000000001,usr0003@test.invalid,User,Zero-Three,User Zero-Three,false
 scim-usr-0004,10000000-0000-0000-0000-000000000002,usr0004@test.invalid,User,Zero-Four,User Zero-Four,true
 scim-usr-0005,10000000-0000-0000-0000-000000000003,usr0005@test.invalid,User,Zero-Five,User Zero-Five,false
+scim-usr-0006,10000000-0000-0000-0000-000000000001,usr0006@test.invalid,User,Zero-Six,User Zero-Six,true
+scim-usr-0007,10000000-0000-0000-0000-000000000001,usr0007@test.invalid,User,Zero-Seven,User Zero-Seven,true
+scim-usr-0008,10000000-0000-0000-0000-000000000001,usr0008@test.invalid,User,Zero-Eight,User Zero-Eight,true
+scim-usr-0009,10000000-0000-0000-0000-000000000001,usr0009@test.invalid,User,Zero-Nine,User Zero-Nine,true
+scim-usr-0010,10000000-0000-0000-0000-000000000001,usr0010@test.invalid,User,Zero-Ten,User Zero-Ten,true
+scim-usr-0011,10000000-0000-0000-0000-000000000001,usr0011@test.invalid,User,Zero-Eleven,User Zero-Eleven,false
+scim-usr-0012,10000000-0000-0000-0000-000000000001,usr0012@test.invalid,User,Zero-Twelve,User Zero-Twelve,true
+scim-usr-0013,10000000-0000-0000-0000-000000000001,usr0013@test.invalid,User,Zero-Thirteen,User Zero-Thirteen,true
+scim-usr-0014,10000000-0000-0000-0000-000000000001,usr0014@test.invalid,User,Zero-Fourteen,User Zero-Fourteen,true
+scim-usr-0015,10000000-0000-0000-0000-000000000001,usr0015@test.invalid,User,Zero-Fifteen,User Zero-Fifteen,true

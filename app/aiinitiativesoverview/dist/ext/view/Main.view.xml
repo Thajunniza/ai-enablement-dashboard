@@ -98,95 +98,84 @@
                 </l:sideContent>
 
                 <l:mainContent>
-                    <l:BlockLayout
-                        id="initiativesBlockLayout"
-                        background="Dashboard">
-                        <l:BlockLayoutRow
-                            id="favoriteRow"
-                            content="{/Initiatives}">
-                            <l:content>
-                                <l:BlockLayoutCell
-                                    id="initiativeBlockCell"
-                                    class="sapUiContentPadding myNarrowCell aiedCard">
-                                    <l:Grid
-                                        id="initiativeGrid"
-                                        defaultSpan="XL12 L12 M12 S12"
-                                        vSpacing="0"
-                                        hSpacing="0">
+                    <f:GridContainer id="initiativesGridContainer" items="{/Initiatives}" class="aiedgrid">
+                        <f:layout>
+                            <f:GridContainerSettings columnSize="20rem" rowSize="auto" gap="1.5rem" />
+                        </f:layout>
+                        <f:items >
+                            <VBox id="initiativeCard" class="aiedCard">
 
-                                        <FlexBox
-                                            id="initiativeTitleRow"
-                                            justifyContent="SpaceBetween"
-                                            alignItems="Start"
-                                            renderType="Bare"
-                                            class="sapUiTinyMarginBottom">
-                                            <ObjectIdentifier
-                                                id="initiativeTitle"
-                                                title="{name}"
-                                                titleActive="true"
-                                                titlePress=".onSelectProduct"
-                                                class="aiedCardTitle" />
-                                                <ObjectStatus
-                                                    id="initiativeStatus"
-                                                    text="{status}"
-                                                    inverted="true"
-                                                    state="{= %{statusCriticality} === 3 ? 'Indication16' : 'Indication13' }" />
-                                        </FlexBox>
-                                        <FlexBox
-                                            id="initiativeTitleRow2"
-                                            justifyContent="SpaceBetween"
-                                            alignItems="Start"
-                                            renderType="Bare"
-                                            class="sapUiTinyMarginBottom">
+                                <FlexBox
+                                    id="initiativeTitleRow"
+                                    justifyContent="SpaceBetween"
+                                    alignItems="Start"
+                                    renderType="Bare"
+                                    class="sapUiTinyMarginBottom">
+                                    <ObjectIdentifier
+                                        id="initiativeTitle"
+                                        title="{name}"
+                                        titleActive="true"
+                                        titlePress=".onSelectProduct"
+                                        class="aiedCardTitle" />
+                                    <ObjectStatus
+                                        id="initiativeStatus"
+                                        text="{status}"
+                                        inverted="true"
+                                        state="{= %{statusCriticality} === 3 ? 'Indication16' : 'Indication13' }" />
+                                </FlexBox>
+                                <FlexBox
+                                    id="initiativeTitleRow2"
+                                    justifyContent="SpaceBetween"
+                                    alignItems="Start"
+                                    renderType="Bare"
+                                    class="sapUiTinyMarginBottom">
+                                    <Text
+                                        id="initiativeOwner"
+                                        text="{= ${owner} ? ('Owner: ' + ${owner}) : '' }"
+                                        class="aiedCardOwner sapUiTinyMarginBottom" />
+                                    <HBox
+                                        id="launchDateRow"
+                                        alignItems="Center"
+                                        class="aiedCardOwner sapUiTinyMarginTop"
+                                        visible="{= %{statusCriticality} === 3 }">
+                                        <core:Icon
+                                            id="launchDateIcon"
+                                            src="sap-icon://calendar"
+                                            color="Neutral"
+                                            class="sapUiTinyMarginEnd" />
                                         <Text
-                                            id="initiativeOwner"
-                                            text="{= ${owner} ? ('Owner: ' + ${owner}) : '' }"
-                                            class="aiedCardOwner sapUiTinyMarginBottom" />
-                                        <HBox
-                                                    id="launchDateRow"
-                                                    alignItems="Center"
-                                                    class="aiedCardOwner sapUiTinyMarginTop"
-                                                    visible="{= %{statusCriticality} === 3 }">
-                                                    <core:Icon
-                                                        id="launchDateIcon"
-                                                        src="sap-icon://calendar"
-                                                        color="Neutral"
-                                                        class="sapUiTinyMarginEnd" />
-                                                    <Text
-                                                        id="launchDateValue"
-                                                        text="{launchDate}" />
-                                                </HBox>
-                                        </FlexBox>
-                                        <VBox
-                                            id="enabledUsersBox"
-                                            class="aiedDivider sapUiTinyMarginBottom">
-                                            <Title
-                                                id="enabledUsersValue"
-                                                text="{enabledUsers}"
-                                                level="H3"
-                                                class="aiedKpiValue" />
-                                            <Text
-                                                id="enabledUsersLabel"
-                                                text="{i18n>card_enabledUsers_label}"
-                                                class="sapThemeSmallText" />
-                                            <Text
-                                                id="enabledUsersSyncNote"
-                                                text="{i18n>card_enabledUsers_sync}"
-                                                class="aiedKpiNote" />
-                                        </VBox>
+                                            id="launchDateValue"
+                                            text="{launchDate}" />
+                                    </HBox>
+                                </FlexBox>
+                                <VBox
+                                    id="enabledUsersBox"
+                                    class="aiedDivider sapUiTinyMarginBottom">
+                                    <Title
+                                        id="enabledUsersValue"
+                                        text="{enabledUsers}"
+                                        level="H3"
+                                        class="aiedKpiValue" />
+                                    <Text
+                                        id="enabledUsersLabel"
+                                        text="{i18n>card_enabledUsers_label}"
+                                        class="sapThemeSmallText" />
+                                    <Text
+                                        id="enabledUsersSyncNote"
+                                        text="{i18n>card_enabledUsers_sync}"
+                                        class="aiedKpiNote" />
+                                </VBox>
 
-                                        <Link
-                                            id="viewDetailsLink"
-                                            text="{i18n>card_viewDetails}"
-                                            press=".onSelectProduct"
-                                            class="aiedViewDetails sapUiSmallMarginTop"
-                                            visible="{= %{statusCriticality} === 3 }" />
+                                <Link
+                                    id="viewDetailsLink"
+                                    text="{i18n>card_viewDetails}"
+                                    press=".onSelectProduct"
+                                    class="aiedViewDetails sapUiSmallMarginTop"
+                                    visible="{= %{statusCriticality} === 3 }" />
 
-                                    </l:Grid>
-                                </l:BlockLayoutCell>
-                            </l:content>
-                        </l:BlockLayoutRow>
-                    </l:BlockLayout>
+                            </VBox>
+                        </f:items>
+                    </f:GridContainer>
                 </l:mainContent>
 
             </l:DynamicSideContent>

@@ -1,2 +1,2 @@
-sap.ui.define(["sap/fe/core/PageController"],function(e){"use strict";return e.extend("com.sap.aiinitiativesoverview.ext.view.Main",{})});
+sap.ui.define(["sap/fe/core/PageController","sap/ui/core/UIComponent"],function(t,e){"use strict";return t.extend("com.sap.aiinitiativesoverview.ext.view.Main",{onInit:function(){t.prototype.onInit.apply(this,arguments);this.oView=this.getView();this.oRouter=this.getAppComponent().getRouter()},onSelectProduct:function(t){var e=t.getSource();var i=e.getBindingContext()||e.getParent().getBindingContext();if(!i){return}this.oRouter.navTo("InitiativeDetail",{initiativeId:encodeURIComponent(i.getProperty("ID"))})}})});
 //# sourceMappingURL=Main.controller.js.map

@@ -1,0 +1,245 @@
+<mvc:View
+    xmlns:core="sap.ui.core"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:macros="sap.fe.macros"
+    controllerName="com.sap.aiinitiativesoverview.ext.controller.UserDetail">
+
+    <macros:Page
+        id="userPage"
+        title="{userModel>/name}"
+        showFooter="false">
+
+        <macros:actions>
+            <Button
+                id="userBackBtn"
+                text="{i18n>btn_back_toInitiative}"
+                icon="sap-icon://nav-back"
+                type="Transparent"
+                press=".onNavBack" />
+        </macros:actions>
+
+        <!-- ═══ HEADER FACTS ═════════════════════════════════════════ -->
+        <macros:headerContent>
+            <HBox id="userFactsRow" renderType="Bare" wrap="Wrap" class="aiedFactsRow">
+
+                <VBox id="userFactEmail" renderType="Bare" class="aiedFact">
+                    <Text id="userFactEmailLabel" text="{i18n>user_fact_email}" class="aiedFactLabel" />
+                    <Text id="userFactEmailValue" text="{= ${userModel>/email} || '–' }" class="aiedFactValue" />
+                </VBox>
+
+                <VBox id="userFactInitiative" renderType="Bare" class="aiedFact aiedFactDivided">
+                    <Text id="userFactInitiativeLabel" text="{i18n>user_fact_initiative}" class="aiedFactLabel" />
+                    <Text id="userFactInitiativeValue" text="{= ${userModel>/initiativeName} || '–' }" class="aiedFactValue" />
+                </VBox>
+
+                <VBox id="userFactAccount" renderType="Bare" class="aiedFact aiedFactDivided">
+                    <Text id="userFactAccountLabel" text="{i18n>user_fact_account}" class="aiedFactLabel" />
+                    <ObjectStatus
+                        id="userFactAccountStatus"
+                        text="{= ${userModel>/active} ? ${i18n>status_enabled} : ${i18n>status_disabled} }"
+                        inverted="true"
+                        state="{= ${userModel>/active} ? 'Success' : 'None' }" />
+                </VBox>
+            </HBox>
+        </macros:headerContent>
+
+        <macros:items>
+            <VBox id="userRoot" class="aiedDetailRoot">
+
+                <!-- ═══ NOT FOUND ═════════════════════════════════════════ -->
+                <VBox
+                    id="userNotFound"
+                    alignItems="Center"
+                    class="aiedPanel aiedEmptyState"
+                    visible="{userModel>/notFound}">
+                    <core:Icon id="userNotFoundIcon" src="sap-icon://person-placeholder" size="2.5rem" class="aiedEmptyIcon" />
+                    <Text id="userNotFoundTitle" text="{i18n>user_notFound_title}" class="aiedEmptyTitle sapUiTinyMarginTop" />
+                    <Text id="userNotFoundText" text="{i18n>user_notFound_text}" class="aiedEmptyText" />
+                </VBox>
+
+                <VBox id="userContent" visible="{= !${userModel>/notFound} }">
+
+                    <!-- ═══ STAT CARDS ════════════════════════════════════ -->
+                    <HBox id="userStatRow" renderType="Bare" class="aiedStatRow">
+
+                        <VBox id="statFirstSeen" class="aiedStatCard aiedAnimIn aiedDelay1">
+                            <Text id="statFirstSeenLabel" text="{i18n>stat_firstSeen}" class="aiedKpiLabel" />
+                            <Text
+                                id="statFirstSeenValue"
+                                class="aiedStatValue"
+                                text="{
+                                    path: 'userModel>/firstSeen',
+                                    type: 'sap.ui.model.type.Date',
+                                    formatOptions: { source: { pattern: 'yyyy-MM-dd' }, style: 'medium' }
+                                }" />
+                        </VBox>
+
+                        <VBox id="statLastSeen" class="aiedStatCard aiedAnimIn aiedDelay1">
+                            <Text id="statLastSeenLabel" text="{i18n>stat_lastSeen}" class="aiedKpiLabel" />
+                            <Text
+                                id="statLastSeenValue"
+                                class="aiedStatValue"
+                                text="{
+                                    path: 'userModel>/lastSeen',
+                                    type: 'sap.ui.model.type.Date',
+                                    formatOptions: { source: { pattern: 'yyyy-MM-dd' }, style: 'medium' }
+                                }" />
+                        </VBox>
+
+                        <VBox id="statStreak" class="aiedStatCard aiedAnimIn aiedDelay2">
+                            <Text id="statStreakLabel" text="{i18n>stat_currentStreak}" class="aiedKpiLabel" />
+                            <Text
+                                id="statStreakValue"
+                                class="aiedStatValue"
+                                text="{= ${userModel>/currentStreak} + ' ' + (${userModel>/grain} === 'WEEKLY' ? ${i18n>unit_weeks} : ${i18n>unit_months}) }" />
+                            <Text
+                                id="statStreakNote"
+                                class="aiedStatNote"
+                                text="{= ${i18n>stat_longest} + ' ' + ${userModel>/longestStreak} + ' ' + (${userModel>/grain} === 'WEEKLY' ? ${i18n>unit_weeks} : ${i18n>unit_months}) }" />
+                        </VBox>
+
+                        <VBox id="statConsistency" class="aiedStatCard aiedAnimIn aiedDelay2">
+                            <Text id="statConsistencyLabel" text="{i18n>stat_consistency}" class="aiedKpiLabel" />
+                            <Text
+                                id="statConsistencyValue"
+                                class="aiedStatValue"
+                                text="{= ${userModel>/consistencyPct} + '%' }" />
+                            <ProgressIndicator
+                                id="statConsistencyBar"
+                                class="aiedStatProgress"
+                                percentValue="{userModel>/consistencyPct}"
+                                showValue="false"
+                                state="Success"
+                                height="0.5rem" />
+                            <Text
+                                id="statConsistencyNote"
+                                class="aiedStatNote"
+                                text="{= ${userModel>/activePeriods} + ' ' + ${i18n>stat_of} + ' ' + ${userModel>/periodsSinceFirst} + ' ' + (${userModel>/grain} === 'WEEKLY' ? ${i18n>unit_weeks} : ${i18n>unit_months}) + ' ' + ${i18n>stat_sinceFirst} }" />
+                        </VBox>
+                    </HBox>
+
+                    <!-- ═══ ACTIVITY STRIP ════════════════════════════════ -->
+                    <VBox id="activitySection" class="aiedPanel aiedPanelSpaced aiedAnimIn aiedDelay2">
+                        <FlexBox
+                            id="activityHeaderRow"
+                            justifyContent="SpaceBetween"
+                            alignItems="Center"
+                            wrap="Wrap"
+                            class="aiedSectionHead">
+                            <VBox id="activityHeaderText">
+                                <Title
+                                    id="activityTitle"
+                                    text="{i18n>activity_title}"
+                                    level="H3"
+                                    class="aiedSectionTitle" />
+                                <Text id="activitySub" text="{i18n>activity_sub}" class="aiedSectionSub" />
+                            </VBox>
+                            <SegmentedButton
+                                id="userGrainToggle"
+                                width="14rem"
+                                selectedKey="WEEKLY"
+                                selectionChange=".onGrainToggle">
+                                <items>
+                                    <SegmentedButtonItem id="userGrainWeekly" key="WEEKLY" text="{i18n>grain_weekly}" />
+                                    <SegmentedButtonItem id="userGrainMonthly" key="MONTHLY" text="{i18n>grain_monthly}" />
+                                </items>
+                            </SegmentedButton>
+                        </FlexBox>
+
+                        <HBox id="activityLegend" renderType="Bare" class="aiedLegend">
+                            <ObjectStatus id="legendActive" text="{i18n>legend_active}" inverted="true" state="Success" />
+                            <ObjectStatus id="legendInactive" text="{i18n>legend_inactive}" inverted="true" state="None" />
+                            <ObjectStatus id="legendPre" text="{i18n>legend_pre}" inverted="false" state="None" />
+                        </HBox>
+
+                        <VBox id="activityGroups" renderType="Bare" items="{activityModel>/groups}">
+                            <HBox id="activityGroupRow" renderType="Bare" class="aiedGroupRow">
+                                <Text id="activityGroupTitle" text="{activityModel>title}" class="aiedGroupTitle" />
+                                <HBox
+                                    id="activityStrip"
+                                    renderType="Bare"
+                                    class="aiedStrip"
+                                    items="{activityModel>cells}">
+                                    <ObjectStatus
+                                        id="activityCell"
+                                        class="aiedCellPill"
+                                        text="{activityModel>label}"
+                                        tooltip="{activityModel>tip}"
+                                        inverted="{= ${activityModel>status} !== 'pre' }"
+                                        state="{= ${activityModel>status} === 'on' ? 'Success' : 'None' }" />
+                                </HBox>
+                            </HBox>
+                        </VBox>
+                    </VBox>
+
+                    <!-- ═══ ACTIVE PERIODS TABLE ══════════════════════════ -->
+                    <VBox id="periodsSection" class="aiedPanel aiedPanelSpaced aiedAnimIn aiedDelay3">
+                        <FlexBox
+                            id="periodsHeaderRow"
+                            justifyContent="SpaceBetween"
+                            alignItems="Center"
+                            wrap="Wrap"
+                            class="aiedSectionHead">
+                            <Title
+                                id="periodsTitle"
+                                text="{i18n>periods_title}"
+                                level="H3"
+                                class="aiedSectionTitle" />
+                            <Text
+                                id="periodsCount"
+                                text="{= ${activityModel>/rows}.length + ' ' + ${i18n>periods_count} }"
+                                class="aiedCountChip" />
+                        </FlexBox>
+
+                        <Table
+                            id="periodsTable"
+                            items="{activityModel>/rows}"
+                            growing="true"
+                            growingThreshold="25"
+                            busy="{userModel>/busy}"
+                            busyIndicatorDelay="0"
+                            class="aiedUserTable"
+                            noDataText="{i18n>periods_empty}">
+                            <columns>
+                                <Column id="colPeriod" width="40%">
+                                    <Text id="colPeriodHeader" text="{i18n>col_period}" />
+                                </Column>
+                                <Column id="colPeriodFirst" width="30%">
+                                    <Text id="colPeriodFirstHeader" text="{i18n>col_firstSeen}" />
+                                </Column>
+                                <Column id="colPeriodLast" width="30%">
+                                    <Text id="colPeriodLastHeader" text="{i18n>col_lastSeen}" />
+                                </Column>
+                            </columns>
+                            <items>
+                                <ColumnListItem id="periodsItem">
+                                    <cells>
+                                        <Text id="cellPeriod" text="{activityModel>periodLabel}" class="aiedUserName" />
+                                        <Text
+                                            id="cellPeriodFirst"
+                                            class="aiedDateText"
+                                            text="{
+                                                path: 'activityModel>firstSeen',
+                                                type: 'sap.ui.model.type.Date',
+                                                formatOptions: { source: { pattern: 'yyyy-MM-dd' }, style: 'medium' }
+                                            }" />
+                                        <Text
+                                            id="cellPeriodLast"
+                                            class="aiedDateText"
+                                            text="{
+                                                path: 'activityModel>lastSeen',
+                                                type: 'sap.ui.model.type.Date',
+                                                formatOptions: { source: { pattern: 'yyyy-MM-dd' }, style: 'medium' }
+                                            }" />
+                                    </cells>
+                                </ColumnListItem>
+                            </items>
+                        </Table>
+                    </VBox>
+
+                </VBox>
+            </VBox>
+        </macros:items>
+    </macros:Page>
+</mvc:View>
