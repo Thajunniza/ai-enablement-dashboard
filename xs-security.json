@@ -72,10 +72,13 @@
     }
   ],
   "oauth2-configuration": {
+    "credential-types": ["binding-secret", "x509"],
     "redirect-uris": [
       "https://*.launchpad.cfapps.us10.hana.ondemand.com/**",
       "https://*.workzone.cfapps.us10.hana.ondemand.com/**",
-      "https://*.cfapps.us10.hana.ondemand.com/**"
+      "https://*.cfapps.us10.hana.ondemand.com/**",
+      "http://localhost:5000/**",
+      "http://localhost:4004/**"
     ]
   }
 }

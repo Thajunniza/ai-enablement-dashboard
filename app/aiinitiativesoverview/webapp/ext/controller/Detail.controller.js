@@ -118,6 +118,7 @@ sap.ui.define([
         _loadTrendCounts: function (sGrain) {
             var oTrendModel = this.getView().getModel("trendModel");
             var oFunctionContext = this.getView().getModel().bindContext("/getTrendCounts(...)");
+            oFunctionContext.setParameter("initiativeId", this._sInitiativeId);
             oFunctionContext.setParameter("grain", sGrain);
             return oFunctionContext.invoke()
                 .then(function () {

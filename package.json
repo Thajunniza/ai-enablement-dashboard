@@ -77,9 +77,6 @@
     "app/*"
   ],
   "sapux": [
-    "app/ai_enablement_dashboard_ui",
-    "app/ai_initiatives-overview",
-    "app/project1",
     "app/aiinitiativesoverview"
   ]
 }

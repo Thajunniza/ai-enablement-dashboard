@@ -30,11 +30,11 @@ service DashboardService {
   // @restrict: [
   //   { grant: ['EXECUTE'], to: ['DashboardViewer', 'DashboardAdmin'] }
   // ]
-  function getTrendCounts(grain: String(10))       returns array of {
-    periodLabel : String(10);
-    grain       : String(10);
-    activeCount : Integer;
-  };
+  function getTrendCounts(grain: String(10), initiativeId: UUID) returns array of {
+  periodLabel : String(10);
+  grain       : String(10);
+  activeCount : Integer;
+};
 
   // ── Enabled user count action ─────────────────────────────────────────────
   // Returns COUNT of active Person records for a given Initiative.

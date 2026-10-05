@@ -2,6 +2,7 @@
 const { executeHttpRequest } = require('@sap-cloud-sdk/http-client');
 const { getDestination }     = require('@sap-cloud-sdk/connectivity');
 
+
 async function scimGet(path) {
   const res = await executeHttpRequest(
     { destinationName: 'IAS_SCIM' },

@@ -423,3 +423,64 @@
 .aiedUserName  { font-size: 14px; font-weight: 600; color: #1A1A1A; }
 .aiedUserEmail { font-size: 13px; color: #6B7280; }
 .aiedDateText  { font-size: 13px; color: #3A3F46; }
+
+/* ── SCREEN 3: USER DRILL-DOWN ─────────────────────────── */
+/* ── SCREEN 3: USER DRILL-DOWN ─────────────────────────── */
+.aiedStatRow {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+@media (max-width: 1000px) { .aiedStatRow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px)  { .aiedStatRow { grid-template-columns: 1fr; } }
+
+.aiedStatCard {
+    background: #fff;
+    border: 1px solid #E2E5E9;
+    border-radius: 12px;
+    padding: 20px 24px;
+}
+.aiedStatValue {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #1D2D3E;
+    margin-top: 6px;
+    display: block;
+}
+
+.aiedStatNote {
+    display: block;
+    font-size: 0.8125rem;
+    color: #6A6D70;
+    margin-top: 6px;
+}
+.aiedStatProgress {
+    margin-top: 10px;
+}
+
+.aiedLegend {
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.aiedGroupRow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.aiedGroupTitle {
+    flex: 0 0 5.5rem;
+    font-size: 0.8125rem;
+    color: #6A6D70;
+}
+.aiedStrip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.aiedCellPill {
+    min-width: 3.25rem;
+    text-align: center;
+}

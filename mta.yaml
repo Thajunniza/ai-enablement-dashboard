@@ -155,6 +155,8 @@ resources:
       service: destination
       service-name: aiEnablementDashboard-destination-service
       service-plan: lite
+    requires:
+      - name: aiEnablementDashboard-auth
 parameters:
   deploy_mode: html5-repo
   enable-parallel-deployments: true

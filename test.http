@@ -2,13 +2,26 @@
 # AI Enablement Dashboard — CAP OData V4 Test Suite
 # Run with: VS Code REST Client extension
 # Server  : cds watch (local, mocked auth)
-# Base URL: http://localhost:4004/odata/v4/dashboard
+#
+# Services
+#   DashboardService  /dashboard   read side, used by the screens
+#   J4CService        /J4C         jobs for the J4C initiative (SCIM sync, usage sync)
+#
 # Auth    : mocked users defined in .cdsrc.json
-#           admin / admin → DashboardAdmin
+#           admin / admin   → DashboardAdmin
 #           viewer / viewer → DashboardViewer
+#
+# Expected values below assume the test CSVs I generated:
+#   Person.csv           15 persons (J4C has 13: 11 active, 2 inactive)
+#   ActiveUserList.csv   164 roster rows
+# Do NOT run the SCIM sync (section C) on top of those test CSVs: the test users
+# are not in the real IAS group, so the sync would deactivate them. Use the CSVs
+# for UI testing, or the sync for real data, not both.
 # ─────────────────────────────────────────────────────────────────────────────
 
-@baseUrl    = http://localhost:4004/dashboard
+@host       = http://localhost:4004
+@baseUrl    = {{host}}/dashboard
+@jobUrl     = {{host}}/J4C
 @adminAuth  = Basic YWRtaW46YWRtaW4=
 @viewerAuth = Basic dmlld2VyOnZpZXdlcg==
 
@@ -18,32 +31,29 @@
 @initiativeId1 = 10000000-0000-0000-0000-000000000001
 @initiativeId2 = 10000000-0000-0000-0000-000000000002
 @initiativeId3 = 10000000-0000-0000-0000-000000000003
+@scimId        = scim-usr-0015
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. READ ALL INITIATIVES — DashboardViewer
-# Expected: 200 OK, array of 3 initiatives with virtual fields computed
-#           enabledUsers populated, statusCriticality populated
-# ─────────────────────────────────────────────────────────────────────────────
+# ═════════════════════════════════════════════════════════════════════════════
+# A. INITIATIVES AND ENABLED USERS (Screen 1 and the Screen 2 header)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# 1. READ ALL INITIATIVES
+# Expected: 200 OK, 3 initiatives, enabledUsers and statusCriticality filled in
 ### Read all initiatives
 GET {{baseUrl}}/Initiatives
 Authorization: {{viewerAuth}}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 2. READ SINGLE INITIATIVE — DashboardAdmin
-# Expected: 200 OK, single initiative row
-#           persons composition NOT in response (excluded in projection)
-# ─────────────────────────────────────────────────────────────────────────────
-### Read single initiative (J4C — Live)
+# 2. READ SINGLE INITIATIVE
+# Expected: 200 OK, one row (J4C)
+### Read single initiative (J4C)
 GET {{baseUrl}}/Initiatives({{initiativeId1}})
 Authorization: {{adminAuth}}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3. CREATE INITIATIVE — DashboardAdmin only
+# 3. CREATE INITIATIVE
 # Expected: 201 Created
-# ─────────────────────────────────────────────────────────────────────────────
 ### Create new initiative
 POST {{baseUrl}}/Initiatives
 Authorization: {{adminAuth}}
@@ -58,11 +68,10 @@ Content-Type: application/json
 }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 4. CREATE INITIATIVE — DashboardViewer (should be rejected)
-# Expected: 403 Forbidden — viewer does not have WRITE scope
-# ─────────────────────────────────────────────────────────────────────────────
-### Create initiative as viewer — expect 403
+# 4. CREATE INITIATIVE AS VIEWER
+# Expected: 403 Forbidden, but only once @restrict is switched back on.
+#           Until then this returns 201 (authorization is planned for later).
+### Create initiative as viewer — 403 once @restrict is on
 POST {{baseUrl}}/Initiatives
 Authorization: {{viewerAuth}}
 Content-Type: application/json
@@ -76,120 +85,193 @@ Content-Type: application/json
 }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 5. GET ENABLED USER COUNT — function action
-# Expected: 200 OK, { count: 2 } for initiativeId1 (2 active persons seeded)
-# ─────────────────────────────────────────────────────────────────────────────
-### Get enabled user count for J4C initiative
+# 5. ENABLED USER COUNT
+# Expected: 200 OK, { count: 11 } for J4C (if the helper counts active persons)
+### Get enabled user count for J4C
 GET {{baseUrl}}/getEnabledUserCount(initiativeId={{initiativeId1}})
 Authorization: {{viewerAuth}}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 6. GET ENABLED USER COUNT — initiative with zero active users
+# 6. ENABLED USER COUNT, initiative with no active users
 # Expected: 200 OK, { count: 0 }
-# ─────────────────────────────────────────────────────────────────────────────
-### Get enabled user count for initiative with no active users
+### Get enabled user count for initiative 3
 GET {{baseUrl}}/getEnabledUserCount(initiativeId={{initiativeId3}})
 Authorization: {{viewerAuth}}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 7. GET ENABLED USER COUNT — missing initiativeId
-# Expected: 400 Bad Request — initiativeId is required
-# ─────────────────────────────────────────────────────────────────────────────
+# 7. ENABLED USER COUNT, missing initiativeId
+# Expected: 400 Bad Request
 ### Get enabled user count — missing param, expect 400
 GET {{baseUrl}}/getEnabledUserCount(initiativeId=null)
 Authorization: {{viewerAuth}}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 8. GET TREND COUNTS — WEEKLY grain
-# Expected: 200 OK, array with periodLabel, grain=WEEKLY, activeCount, isEstimated=true
-# isEstimated=true because WEEKLY is derived from Audit Log — labeled estimated in UI
-# ─────────────────────────────────────────────────────────────────────────────
-### Get trend counts — WEEKLY
-GET {{baseUrl}}/getTrendCounts(grain='WEEKLY')
+# ═════════════════════════════════════════════════════════════════════════════
+# B. USAGE: TREND AND ROSTER (Screen 2 and Screen 3)
+# ═════════════════════════════════════════════════════════════════════════════
+
+# 8. TREND COUNTS, WEEKLY, scoped to J4C
+# Expected: 200 OK, 18 points, W23 to W40, activeCount:
+#   2, 3, 4, 4, 5, 5, 5, 8, 8, 6, 7, 6, 6, 6, 10, 8, 8, 7
+### Trend counts — WEEKLY, J4C
+GET {{baseUrl}}/getTrendCounts(grain='WEEKLY',initiativeId={{initiativeId1}})
 Authorization: {{viewerAuth}}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 9. GET TREND COUNTS — MONTHLY grain
-# Expected: 200 OK, isEstimated=false for MONTHLY (authoritative period)
-# ─────────────────────────────────────────────────────────────────────────────
-### Get trend counts — MONTHLY
+# 9. TREND COUNTS, MONTHLY, scoped to J4C
+# Expected: 2026-06:5, 2026-07:8, 2026-08:10, 2026-09:11, 2026-10:5
+### Trend counts — MONTHLY, J4C
+GET {{baseUrl}}/getTrendCounts(grain='MONTHLY',initiativeId={{initiativeId1}})
+Authorization: {{viewerAuth}}
+
+
+# 10. TREND COUNTS, YEARLY, scoped to J4C
+# Expected: 2026:12
+### Trend counts — YEARLY, J4C
+GET {{baseUrl}}/getTrendCounts(grain='YEARLY',initiativeId={{initiativeId1}})
+Authorization: {{viewerAuth}}
+
+
+# 11. TREND COUNTS, scoping check
+# Expected: 2026-09 is 1 here (initiative 2), and 11 for J4C above. The unscoped
+#           call in test 12 returns 12 for 2026-09, the sum of both.
+### Trend counts — MONTHLY, initiative 2
+GET {{baseUrl}}/getTrendCounts(grain='MONTHLY',initiativeId={{initiativeId2}})
+Authorization: {{viewerAuth}}
+
+
+# 12. TREND COUNTS, no initiativeId (all initiatives together)
+# Expected: 2026-06:5, 07:8, 08:10, 09:12, 10:6
+### Trend counts — MONTHLY, all initiatives
 GET {{baseUrl}}/getTrendCounts(grain='MONTHLY')
 Authorization: {{viewerAuth}}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 10. GET TREND COUNTS — YEARLY grain
-# Expected: 200 OK, isEstimated=true — YEARLY derived from Audit Log, labeled estimated
-# ─────────────────────────────────────────────────────────────────────────────
-### Get trend counts — YEARLY
-GET {{baseUrl}}/getTrendCounts(grain='YEARLY')
+# 13. TREND COUNTS, invalid grain
+# Expected: 400 Bad Request, "Invalid grain: DAILY. Must be WEEKLY, MONTHLY or YEARLY."
+### Trend counts — invalid grain, expect 400
+GET {{baseUrl}}/getTrendCounts(grain='DAILY',initiativeId={{initiativeId1}})
 Authorization: {{viewerAuth}}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 11. GET TREND COUNTS — invalid grain value
-# Expected: 400 Bad Request — "Invalid grain value: DAILY"
-# ─────────────────────────────────────────────────────────────────────────────
-### Get trend counts — invalid grain, expect 400
-GET {{baseUrl}}/getTrendCounts(grain='DAILY')
-Authorization: {{viewerAuth}}
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 12. READ ACTIVE USERS — all periods
-# Expected: 200 OK, person association NOT in response (excluded in projection)
-#           periodLabel, grain, firstSeen, lastSeen, isEstimated only
-# ─────────────────────────────────────────────────────────────────────────────
+# 14. ACTIVE USERS, all rows
+# Expected: 200 OK. Each row has periodLabel, grain, person_scimId,
+#           person_initiative_ID, firstSeen, lastSeen. No isEstimated field.
 ### Read all active user list entries
 GET {{baseUrl}}/ActiveUsers
 Authorization: {{viewerAuth}}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 13. READ ACTIVE USERS — filter by MONTHLY grain
-# Expected: 200 OK, only MONTHLY rows returned
-# ─────────────────────────────────────────────────────────────────────────────
+# 15. ACTIVE USERS, filter by grain
 ### Read active users filtered by MONTHLY grain
 GET {{baseUrl}}/ActiveUsers?$filter=grain eq 'MONTHLY'
 Authorization: {{viewerAuth}}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 14. UNAUTHORIZED — no credentials at all
-# Expected: 401 Unauthorized
-# ─────────────────────────────────────────────────────────────────────────────
-### No credentials — expect 401
+# 16. SCREEN 2 USER LIST: one period, scoped to J4C, person expanded
+# Expected: 11 rows (J4C, MONTHLY, 2026-09), each with a person object.
+# This is the path filter the Screen 2 controller uses. If it fails, use the
+# foreign-key version in test 17.
+### Active users for a period — path filter
+GET {{baseUrl}}/ActiveUsers?$filter=grain eq 'MONTHLY' and periodLabel eq '2026-09' and person/initiative_ID eq {{initiativeId1}}&$expand=person
+Authorization: {{viewerAuth}}
+
+
+# 17. SAME QUERY with the foreign-key property
+# Expected: the same 11 rows as test 16.
+### Active users for a period — foreign-key filter
+GET {{baseUrl}}/ActiveUsers?$filter=grain eq 'MONTHLY' and periodLabel eq '2026-09' and person_initiative_ID eq {{initiativeId1}}&$expand=person
+Authorization: {{viewerAuth}}
+
+
+# 18. SCREEN 2 ENABLED LIST
+# Expected: 13 persons for J4C (11 active, 2 inactive)
+### Persons of J4C
+GET {{baseUrl}}/Persons?$filter=initiative_ID eq {{initiativeId1}}
+Authorization: {{viewerAuth}}
+
+
+# 19. SCREEN 3 PROFILE
+# Expected: 1 row, scim-usr-0015, active true, initiativeName filled in
+### One person's profile
+GET {{baseUrl}}/Persons?$filter=scimId eq '{{scimId}}' and initiative_ID eq {{initiativeId1}}
+Authorization: {{viewerAuth}}
+
+
+# 20. SCREEN 3 ROSTER
+# Expected: 4 rows for scim-usr-0015:
+#   WEEKLY 2026-W39 (2026-09-22 to 2026-09-25), WEEKLY 2026-W40 (2026-09-28),
+#   MONTHLY 2026-09 (2026-09-22 to 2026-09-28), YEARLY 2026 (2026-09-22 to 2026-09-28)
+### One person's period rows
+GET {{baseUrl}}/ActiveUsers?$filter=person_scimId eq '{{scimId}}' and person_initiative_ID eq {{initiativeId1}}
+Authorization: {{viewerAuth}}
+
+
+# 21. NO CREDENTIALS
+# Expected: 401 Unauthorized, but only once authentication is switched back on.
+### No credentials — 401 once authentication is on
 GET {{baseUrl}}/Initiatives
 
-@host = http://localhost:4004
 
-### 1. Check current Person state (baseline from seed CSV)
-GET {{host}}/dashboard/Persons
+# ═════════════════════════════════════════════════════════════════════════════
+# C. J4C USER SYNC (SCIM job). Skip these if you loaded the test CSVs.
+# ═════════════════════════════════════════════════════════════════════════════
 
-### 2. Trigger J4C user sync
-POST {{host}}/admin/syncJ4CUsers
+### C1. Check current Person state
+GET {{baseUrl}}/Persons
+
+### C2. Trigger the J4C user sync
+# Expected: 200 OK, { created, reactivated, deactivated }
+POST {{jobUrl}}/syncJ4CUsers
 Content-Type: application/json
 
 {}
 
-### 3. Check Person state after sync
-# Expect: Alice Chen created, Bin Jiang refreshed, Robert Maloney active:false (not deleted)
-GET {{host}}/dashboard/Persons
+### C3. Check Person state after the sync
+GET {{baseUrl}}/Persons
 
-### 4. Run sync again - should be idempotent
-# Expect: created:0, reactivated:0, refreshed:2, deactivated:0
-POST {{host}}/admin/syncJ4CUsers
+### C4. Run the sync again, it must be idempotent
+# Expected: created:0, reactivated:0, deactivated:0
+POST {{jobUrl}}/syncJ4CUsers
 Content-Type: application/json
 
 {}
 
-### 5. Check Person state after second sync (only lastSeenAt should move)
-GET {{host}}/dashboard/Persons
+### C5. Initiatives again, the enabledUsers count should match the active persons
+GET {{baseUrl}}/Initiatives
 
-### 6. Check Initiatives too, once enabledUsers is wired up
-GET {{host}}/dashboard/Initiatives
+
+# ═════════════════════════════════════════════════════════════════════════════
+# D. J4C USAGE SYNC (audit log -> DailyAccess -> ActiveUserList -> cleanup)
+# ═════════════════════════════════════════════════════════════════════════════
+
+### D1. First wiring check, before J4C_DAS_CLIENT_ID is set
+# Expected: 500 with "Usage source 'J4C' has no clientId ..."
+# This message shows the call reached the pipeline.
+POST {{jobUrl}}/syncJ4CUsage
+Content-Type: application/json
+
+{}
+
+### D2. Normal daily run (needs J4C_DAS_CLIENT_ID and the audit log binding)
+# Expected: 200 OK, { scanned, accessEvents, matched, unmatchedUsers, rosterRows, cleaned }
+POST {{jobUrl}}/syncJ4CUsage
+Content-Type: application/json
+
+{}
+
+### D3. First run only: backfill the 90-day retention window
+POST {{jobUrl}}/syncJ4CUsage
+Content-Type: application/json
+
+{ "daysBack": 90 }
+
+### D4. Run D2 twice in a row, it must be idempotent
+# Expected: the second run gives the same matched count, and ActiveUsers has no new rows
+POST {{jobUrl}}/syncJ4CUsage
+Content-Type: application/json
+
+{}
+
+### D5. After a run, check the roster grew with real data
+GET {{baseUrl}}/ActiveUsers?$filter=person_initiative_ID eq {{initiativeId1}}&$orderby=periodLabel desc&$top=20
