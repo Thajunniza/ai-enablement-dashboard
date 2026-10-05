@@ -1,0 +1,6 @@
+scimId,initiative_ID,email,firstName,lastName,displayName,active
+scim-usr-0001,10000000-0000-0000-0000-000000000001,usr0001@test.invalid,User,Zero-One,User Zero-One,true
+scim-usr-0002,10000000-0000-0000-0000-000000000001,usr0002@test.invalid,User,Zero-Two,User Zero-Two,true
+scim-usr-0003,10000000-0000-0000-0000-000000000001,usr0003@test.invalid,User,Zero-Three,User Zero-Three,false
+scim-usr-0004,10000000-0000-0000-0000-000000000002,usr0004@test.invalid,User,Zero-Four,User Zero-Four,true
+scim-usr-0005,10000000-0000-0000-0000-000000000003,usr0005@test.invalid,User,Zero-Five,User Zero-Five,false

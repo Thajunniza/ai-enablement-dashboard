@@ -1,0 +1,315 @@
+<mvc:View
+    xmlns:core="sap.ui.core"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m"
+    xmlns:macros="sap.fe.macros"
+    xmlns:viz="sap.viz.ui5.controls"
+    xmlns:vizdata="sap.viz.ui5.data"
+    xmlns:vizfeeds="sap.viz.ui5.controls.common.feeds"
+    controllerName="com.sap.aiinitiativesoverview.ext.controller.Detail">
+
+    <macros:Page
+        id="detailPage"
+        title="{detailModel>/name}"
+        showFooter="false">
+
+        <macros:actions>
+            <Button
+                id="detailBackBtn"
+                text="{i18n>btn_back}"
+                icon="sap-icon://nav-back"
+                type="Transparent"
+                press=".onNavBack" />
+        </macros:actions>
+
+        <!-- ═══ HEADER FACTS ═════════════════════════════════════════ -->
+        <macros:headerContent>
+            <HBox id="detailFactsRow" renderType="Bare" wrap="Wrap" class="aiedFactsRow">
+
+                <VBox id="factOwner" renderType="Bare" class="aiedFact">
+                    <Text id="factOwnerLabel" text="{i18n>detail_fact_owner}" class="aiedFactLabel" />
+                    <Text
+                        id="factOwnerValue"
+                        text="{= ${detailModel>/owner} || 'TBD' }"
+                        class="aiedFactValue" />
+                </VBox>
+
+                <VBox id="factIas" renderType="Bare" class="aiedFact aiedFactDivided">
+                    <Text id="factIasLabel" text="{i18n>detail_fact_ias}" class="aiedFactLabel" />
+                    <Text
+                        id="factIasValue"
+                        text="{= ${detailModel>/iasGroup} || '–' }"
+                        class="aiedCodeChip" />
+                </VBox>
+
+                <VBox
+                    id="factLaunch"
+                    renderType="Bare"
+                    class="aiedFact aiedFactDivided"
+                    visible="{= ${detailModel>/statusCriticality} === 3 }">
+                    <Text id="factLaunchLabel" text="{i18n>detail_fact_launch}" class="aiedFactLabel" />
+                    <Text
+                        id="factLaunchValue"
+                        class="aiedFactValue"
+                        text="{
+                            path: 'detailModel>/launchDate',
+                            type: 'sap.ui.model.type.Date',
+                            formatOptions: { source: { pattern: 'yyyy-MM-dd' }, style: 'medium' }
+                        }" />
+                </VBox>
+
+                <VBox id="factStatus" renderType="Bare" class="aiedFact aiedFactDivided">
+                    <Text id="factStatusLabel" text="{i18n>detail_fact_status}" class="aiedFactLabel" />
+                    <ObjectStatus
+                        id="detailStatus"
+                        text="{detailModel>/status}"
+                        inverted="true"
+                        state="{= ${detailModel>/statusCriticality} === 3 ? 'Indication16' : 'Indication13' }" />
+                </VBox>
+            </HBox>
+        </macros:headerContent>
+
+        <macros:items>
+            <VBox id="detailRoot" class="aiedDetailRoot">
+
+                <!-- ═══ KPI CARDS — click to switch the list below ═══════ -->
+                <HBox id="detailKpiRow" renderType="Bare" class="aiedKpiRow">
+
+                    <HBox
+                        id="enabledUsersKpi"
+                        alignItems="Center"
+                        justifyContent="SpaceBetween"
+                        class="aiedKpiCard aiedKpiCardBlue aiedAnimIn aiedDelay1">
+                        <HBox id="enabledUsersKpiLeft" alignItems="Center">
+                            <VBox
+                                id="enabledUsersKpiIconBox"
+                                justifyContent="Center"
+                                alignItems="Center"
+                                class="aiedKpiIcon aiedKpiIconBlue">
+                                <core:Icon id="enabledUsersKpiIcon" src="sap-icon://group" size="1.25rem" />
+                            </VBox>
+                            <VBox id="enabledUsersKpiText">
+                                <Text
+                                    id="enabledUsersKpiLabel"
+                                    text="{i18n>card_enabledUsers_label}"
+                                    class="aiedKpiLabel" />
+                                <Text
+                                    id="enabledUsersKpiNote"
+                                    text="{i18n>card_enabledUsers_sync}"
+                                    class="aiedKpiNote" />
+                            </VBox>
+                        </HBox>
+                        <VBox id="enabledUsersKpiRight" alignItems="End">
+                            <Title
+                                id="enabledUsersKpiValue"
+                                text="{detailModel>/enabledUsersCount}"
+                                level="H2"
+                                class="aiedKpiValue" />
+                            <Text id="enabledUsersKpiHint" text="{i18n>kpi_viewList}" class="aiedKpiHint" />
+                        </VBox>
+                    </HBox>
+
+                    <HBox
+                        id="activeUsersKpi"
+                        alignItems="Center"
+                        justifyContent="SpaceBetween"
+                        class="aiedKpiCard aiedKpiCardGreen aiedAnimIn aiedDelay2">
+                        <HBox id="activeUsersKpiLeft" alignItems="Center">
+                            <VBox
+                                id="activeUsersKpiIconBox"
+                                justifyContent="Center"
+                                alignItems="Center"
+                                class="aiedKpiIcon aiedKpiIconGreen">
+                                <core:Icon id="activeUsersKpiIcon" src="sap-icon://trend-up" size="1.25rem" />
+                            </VBox>
+                            <VBox id="activeUsersKpiText">
+                                <Text
+                                    id="activeUsersKpiLabel"
+                                    text="{i18n>card_activeUsers_label}"
+                                    class="aiedKpiLabel" />
+                                <Text
+                                    id="activeUsersKpiNote"
+                                    text="{= ${detailModel>/activeUsersCount} === 0 ? ${i18n>card_activeUsers_pending} : ${i18n>card_activeUsers_note} }"
+                                    class="aiedKpiNote" />
+                            </VBox>
+                        </HBox>
+                        <VBox id="activeUsersKpiRight" alignItems="End">
+                            <Title
+                                id="activeUsersKpiValue"
+                                text="{detailModel>/activeUsersCount}"
+                                level="H2"
+                                class="aiedKpiValue" />
+                            <Text id="activeUsersKpiHint" text="{i18n>kpi_viewList}" class="aiedKpiHint" />
+                        </VBox>
+                    </HBox>
+                </HBox>
+
+                <!-- ═══ USAGE TREND ═══════════════════════════════════════ -->
+                <VBox id="trendSection" class="aiedPanel aiedPanelSpaced aiedAnimIn aiedDelay3">
+                    <FlexBox
+                        id="trendHeaderRow"
+                        justifyContent="SpaceBetween"
+                        alignItems="Center"
+                        wrap="Wrap"
+                        class="aiedSectionHead">
+                        <VBox id="trendHeaderText">
+                            <Title
+                                id="trendTitle"
+                                text="{i18n>usage_trend_title}"
+                                level="H3"
+                                class="aiedSectionTitle" />
+                            <Text
+                                id="trendSub"
+                                text="{i18n>usage_trend_sub}"
+                                class="aiedSectionSub" />
+                        </VBox>
+                        <SegmentedButton
+                            id="grainToggle"
+                            selectedKey="MONTHLY"
+                            selectionChange=".onGrainToggle">
+                            <items>
+                                <SegmentedButtonItem id="grainWeekly" key="WEEKLY" text="{i18n>grain_weekly}" />
+                                <SegmentedButtonItem id="grainMonthly" key="MONTHLY" text="{i18n>grain_monthly}" />
+                                <SegmentedButtonItem id="grainYearly" key="YEARLY" text="{i18n>grain_yearly}" />
+                            </items>
+                        </SegmentedButton>
+                    </FlexBox>
+
+                    <viz:VizFrame
+                        id="trendChart"
+                        uiConfig="{applicationSet:'fiori'}"
+                        vizType="line"
+                        height="340px"
+                        width="100%"
+                        selectData=".onTrendSelect"
+                        deselectData=".onTrendDeselect"
+                        visible="{= ${trendModel>/results}.length > 0 }"
+                        vizProperties="{plotArea:{dataLabel:{visible:true}, colorPalette:['#0057D8'], marker:{visible:true, size:8}}, interaction:{selectability:{mode:'EXCLUSIVE'}}, title:{visible:false}}">
+                        <viz:dataset>
+                            <vizdata:FlattenedDataset id="trendDataset" data="{trendModel>/results}">
+                                <vizdata:dimensions>
+                                    <vizdata:DimensionDefinition
+                                        id="trendPeriodDim"
+                                        name="Period"
+                                        value="{trendModel>periodLabel}" />
+                                </vizdata:dimensions>
+                                <vizdata:measures>
+                                    <vizdata:MeasureDefinition
+                                        id="trendActiveMeasure"
+                                        name="Active users"
+                                        value="{trendModel>activeCount}" />
+                                </vizdata:measures>
+                            </vizdata:FlattenedDataset>
+                        </viz:dataset>
+                        <viz:feeds>
+                            <vizfeeds:FeedItem id="trendValueFeed" uid="valueAxis" type="Measure" values="Active users" />
+                            <vizfeeds:FeedItem id="trendCategoryFeed" uid="categoryAxis" type="Dimension" values="Period" />
+                        </viz:feeds>
+                    </viz:VizFrame>
+
+                    <VBox
+                        id="trendEmptyState"
+                        alignItems="Center"
+                        class="aiedEmptyState"
+                        visible="{= ${trendModel>/results}.length === 0 }">
+                        <core:Icon id="trendEmptyIcon" src="sap-icon://line-chart" size="2.5rem" class="aiedEmptyIcon" />
+                        <Text id="trendEmptyTitle" text="{i18n>usage_empty_title}" class="aiedEmptyTitle sapUiTinyMarginTop" />
+                        <Text id="trendEmptyText" text="{i18n>usage_pending_note}" class="aiedEmptyText" />
+                    </VBox>
+                </VBox>
+
+                <!-- ═══ USER LIST — driven by KPI cards / chart ═══════════ -->
+                <VBox id="userListSection" class="aiedPanel aiedPanelSpaced aiedAnimIn aiedDelay3">
+                    <FlexBox
+                        id="userListHeaderRow"
+                        justifyContent="SpaceBetween"
+                        alignItems="Center"
+                        wrap="Wrap"
+                        class="aiedSectionHead">
+                        <VBox id="userListHeaderText">
+                            <Title
+                                id="userListTitle"
+                                text="{= ${detailModel>/listMode} === 'ACTIVE' ? ${i18n>list_title_active} : ${i18n>list_title_enabled} }"
+                                level="H3"
+                                class="aiedSectionTitle" />
+                            <Text
+                                id="userListSub"
+                                text="{= ${detailModel>/listMode} === 'ACTIVE' ? (${detailModel>/listPeriod} ? ${i18n>list_sub_active} + ' ' + ${detailModel>/listPeriod} : ${i18n>list_sub_active_none}) : ${i18n>list_sub_enabled} }"
+                                class="aiedSectionSub" />
+                        </VBox>
+                        <Text
+                            id="userListCount"
+                            text="{= ${detailModel>/listCount} + ' ' + ${i18n>list_count_users} }"
+                            class="aiedCountChip" />
+                    </FlexBox>
+
+                    <Table
+                        id="userListTable"
+                        items="{userListModel>/}"
+                        growing="true"
+                        growingThreshold="25"
+                        busy="{detailModel>/listBusy}"
+                        busyIndicatorDelay="0"
+                        class="aiedUserTable"
+                        noDataText="{i18n>usage_pending_note}">
+                        <columns>
+                            <Column id="colName" width="30%">
+                                <Text id="colNameHeader" text="{i18n>col_name}" />
+                            </Column>
+                            <Column id="colEmail" width="30%">
+                                <Text id="colEmailHeader" text="{i18n>col_email}" />
+                            </Column>
+                            <Column id="colAccount" width="20%" visible="{= ${detailModel>/listMode} === 'ENABLED' }">
+                                <Text id="colAccountHeader" text="{i18n>col_account}" />
+                            </Column>
+                            <Column id="colFirstSeen" width="20%" visible="{= ${detailModel>/listMode} === 'ACTIVE' }">
+                                <Text id="colFirstSeenHeader" text="{i18n>col_firstSeen}" />
+                            </Column>
+                            <Column id="colLastSeen" width="20%" visible="{= ${detailModel>/listMode} === 'ACTIVE' }">
+                                <Text id="colLastSeenHeader" text="{i18n>col_lastSeen}" />
+                            </Column>
+                        </columns>
+                        <items>
+                            <ColumnListItem id="userListItem">
+                                <cells>
+                                    <HBox id="cellNameBox" alignItems="Center">
+                                        <Avatar
+                                            id="cellAvatar"
+                                            src="sap-icon://person-placeholder"
+                                            displayShape="Circle"
+                                            displaySize="XS"
+                                            backgroundColor="Accent6"
+                                            class="sapUiSmallMarginEnd" />
+                                        <Text id="cellName" text="{userListModel>name}" class="aiedUserName" />
+                                    </HBox>
+                                    <Text id="cellEmail" text="{userListModel>email}" class="aiedUserEmail" />
+                                    <ObjectStatus
+                                        id="cellAccount"
+                                        text="{= ${userListModel>active} ? ${i18n>status_enabled} : ${i18n>status_disabled} }"
+                                        state="{= ${userListModel>active} ? 'Success' : 'None' }" />
+                                    <Text
+                                        id="cellFirstSeen"
+                                        class="aiedDateText"
+                                        text="{
+                                            path: 'userListModel>firstSeen',
+                                            type: 'sap.ui.model.type.Date',
+                                            formatOptions: { source: { pattern: 'yyyy-MM-dd' }, style: 'medium' }
+                                        }" />
+                                    <Text
+                                        id="cellLastSeen"
+                                        class="aiedDateText"
+                                        text="{
+                                            path: 'userListModel>lastSeen',
+                                            type: 'sap.ui.model.type.Date',
+                                            formatOptions: { source: { pattern: 'yyyy-MM-dd' }, style: 'medium' }
+                                        }" />
+                                </cells>
+                            </ColumnListItem>
+                        </items>
+                    </Table>
+                </VBox>
+
+            </VBox>
+        </macros:items>
+    </macros:Page>
+</mvc:View>

@@ -62,7 +62,13 @@
       "libs": {
         "sap.m": {},
         "sap.ui.core": {},
-        "sap.fe.core": {}
+        "sap.fe.core": {},
+        "sap.fe.templates": {},
+        "sap.fe.macros": {},
+        "sap.f": {},
+        "sap.uxap": {},
+        "sap.viz": {},
+        "sap.suite.ui.microchart": {}
       }
     },
     "contentDensities": {
@@ -104,6 +110,11 @@
           "name": "InitiativesMain",
           "pattern": ":?query:",
           "target": "InitiativesMain"
+        },
+        {
+          "name": "InitiativeDetail",
+          "pattern": "Initiatives/{initiativeId}",
+          "target": "InitiativeDetail"
         }
       ],
       "targets": {
@@ -113,9 +124,27 @@
           "name": "sap.fe.core.fpm",
           "options": {
             "settings": {
-              "navigation": {},
+              "navigation": {
+                "Initiatives": {
+                  "detail": {
+                    "route": "InitiativeDetail"
+                  }
+                }
+              },
               "contextPath": "/Initiatives",
               "viewName": "com.sap.aiinitiativesoverview.ext.view.Main"
+            }
+          }
+        },
+        "InitiativeDetail": {
+          "type": "Component",
+          "id": "InitiativeDetail",
+          "name": "sap.fe.core.fpm",
+          "options": {
+            "settings": {
+              "navigation": {},
+              "contextPath": "/Initiatives",
+              "viewName": "com.sap.aiinitiativesoverview.ext.view.Detail"
             }
           }
         }

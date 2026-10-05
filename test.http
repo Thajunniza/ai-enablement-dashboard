@@ -1,3 +1,171 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AI Enablement Dashboard — CAP OData V4 Test Suite
+# Run with: VS Code REST Client extension
+# Server  : cds watch (local, mocked auth)
+# Base URL: http://localhost:4004/odata/v4/dashboard
+# Auth    : mocked users defined in .cdsrc.json
+#           admin / admin → DashboardAdmin
+#           viewer / viewer → DashboardViewer
+# ─────────────────────────────────────────────────────────────────────────────
+
+@baseUrl    = http://localhost:4004/dashboard
+@adminAuth  = Basic YWRtaW46YWRtaW4=
+@viewerAuth = Basic dmlld2VyOnZpZXdlcg==
+
+# YWRtaW46YWRtaW4=  = base64("admin:admin")
+# dmlld2VyOnZpZXdlcg== = base64("viewer:viewer")
+
+@initiativeId1 = 10000000-0000-0000-0000-000000000001
+@initiativeId2 = 10000000-0000-0000-0000-000000000002
+@initiativeId3 = 10000000-0000-0000-0000-000000000003
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. READ ALL INITIATIVES — DashboardViewer
+# Expected: 200 OK, array of 3 initiatives with virtual fields computed
+#           enabledUsers populated, statusCriticality populated
+# ─────────────────────────────────────────────────────────────────────────────
+### Read all initiatives
+GET {{baseUrl}}/Initiatives
+Authorization: {{viewerAuth}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. READ SINGLE INITIATIVE — DashboardAdmin
+# Expected: 200 OK, single initiative row
+#           persons composition NOT in response (excluded in projection)
+# ─────────────────────────────────────────────────────────────────────────────
+### Read single initiative (J4C — Live)
+GET {{baseUrl}}/Initiatives({{initiativeId1}})
+Authorization: {{adminAuth}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. CREATE INITIATIVE — DashboardAdmin only
+# Expected: 201 Created
+# ─────────────────────────────────────────────────────────────────────────────
+### Create new initiative
+POST {{baseUrl}}/Initiatives
+Authorization: {{adminAuth}}
+Content-Type: application/json
+
+{
+  "name"      : "AI Code Review Pilot",
+  "owner"     : "Platform Engineering Lead",
+  "status"    : "ComingSoon",
+  "launchDate": "2027-01-15",
+  "iasGroup"  : "SAP_AI_CODE_REVIEW_ENDUSER"
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. CREATE INITIATIVE — DashboardViewer (should be rejected)
+# Expected: 403 Forbidden — viewer does not have WRITE scope
+# ─────────────────────────────────────────────────────────────────────────────
+### Create initiative as viewer — expect 403
+POST {{baseUrl}}/Initiatives
+Authorization: {{viewerAuth}}
+Content-Type: application/json
+
+{
+  "name"      : "Unauthorized Initiative",
+  "owner"     : "Nobody",
+  "status"    : "Live",
+  "launchDate": "2026-10-01",
+  "iasGroup"  : "SAP_UNAUTHORIZED_GROUP"
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. GET ENABLED USER COUNT — function action
+# Expected: 200 OK, { count: 2 } for initiativeId1 (2 active persons seeded)
+# ─────────────────────────────────────────────────────────────────────────────
+### Get enabled user count for J4C initiative
+GET {{baseUrl}}/getEnabledUserCount(initiativeId={{initiativeId1}})
+Authorization: {{viewerAuth}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. GET ENABLED USER COUNT — initiative with zero active users
+# Expected: 200 OK, { count: 0 }
+# ─────────────────────────────────────────────────────────────────────────────
+### Get enabled user count for initiative with no active users
+GET {{baseUrl}}/getEnabledUserCount(initiativeId={{initiativeId3}})
+Authorization: {{viewerAuth}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. GET ENABLED USER COUNT — missing initiativeId
+# Expected: 400 Bad Request — initiativeId is required
+# ─────────────────────────────────────────────────────────────────────────────
+### Get enabled user count — missing param, expect 400
+GET {{baseUrl}}/getEnabledUserCount(initiativeId=null)
+Authorization: {{viewerAuth}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. GET TREND COUNTS — WEEKLY grain
+# Expected: 200 OK, array with periodLabel, grain=WEEKLY, activeCount, isEstimated=true
+# isEstimated=true because WEEKLY is derived from Audit Log — labeled estimated in UI
+# ─────────────────────────────────────────────────────────────────────────────
+### Get trend counts — WEEKLY
+GET {{baseUrl}}/getTrendCounts(grain='WEEKLY')
+Authorization: {{viewerAuth}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. GET TREND COUNTS — MONTHLY grain
+# Expected: 200 OK, isEstimated=false for MONTHLY (authoritative period)
+# ─────────────────────────────────────────────────────────────────────────────
+### Get trend counts — MONTHLY
+GET {{baseUrl}}/getTrendCounts(grain='MONTHLY')
+Authorization: {{viewerAuth}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 10. GET TREND COUNTS — YEARLY grain
+# Expected: 200 OK, isEstimated=true — YEARLY derived from Audit Log, labeled estimated
+# ─────────────────────────────────────────────────────────────────────────────
+### Get trend counts — YEARLY
+GET {{baseUrl}}/getTrendCounts(grain='YEARLY')
+Authorization: {{viewerAuth}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 11. GET TREND COUNTS — invalid grain value
+# Expected: 400 Bad Request — "Invalid grain value: DAILY"
+# ─────────────────────────────────────────────────────────────────────────────
+### Get trend counts — invalid grain, expect 400
+GET {{baseUrl}}/getTrendCounts(grain='DAILY')
+Authorization: {{viewerAuth}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 12. READ ACTIVE USERS — all periods
+# Expected: 200 OK, person association NOT in response (excluded in projection)
+#           periodLabel, grain, firstSeen, lastSeen, isEstimated only
+# ─────────────────────────────────────────────────────────────────────────────
+### Read all active user list entries
+GET {{baseUrl}}/ActiveUsers
+Authorization: {{viewerAuth}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 13. READ ACTIVE USERS — filter by MONTHLY grain
+# Expected: 200 OK, only MONTHLY rows returned
+# ─────────────────────────────────────────────────────────────────────────────
+### Read active users filtered by MONTHLY grain
+GET {{baseUrl}}/ActiveUsers?$filter=grain eq 'MONTHLY'
+Authorization: {{viewerAuth}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 14. UNAUTHORIZED — no credentials at all
+# Expected: 401 Unauthorized
+# ─────────────────────────────────────────────────────────────────────────────
+### No credentials — expect 401
+GET {{baseUrl}}/Initiatives
+
 @host = http://localhost:4004
 
 ### 1. Check current Person state (baseline from seed CSV)
