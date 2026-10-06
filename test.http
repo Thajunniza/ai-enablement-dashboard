@@ -212,7 +212,12 @@ Authorization: {{viewerAuth}}
 ### No credentials — 401 once authentication is on
 GET {{baseUrl}}/Initiatives
 
+# 22. CLEAR DB
+###
+POST {{baseUrl}}/resetData
+Content-Type: application/json
 
+{}
 # ═════════════════════════════════════════════════════════════════════════════
 # C. J4C USER SYNC (SCIM job). Skip these if you loaded the test CSVs.
 # ═════════════════════════════════════════════════════════════════════════════

@@ -48,5 +48,8 @@ service DashboardService {
     count : Integer;
   };
 
+  // Reset data
+  action resetData() returns { dailyAccess : Integer; activeUsers : Integer; persons : Integer; initiatives : Integer };
+
 
 }

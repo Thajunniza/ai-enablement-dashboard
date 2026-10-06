@@ -3,14 +3,7 @@ const cds = require('@sap/cds');
 const { diffPersonSync } = require('./lib/enabledUsers/diffPersonSync');
 const usage = require('./lib/activeUsers/usage-pipeline');
 const { getGroupMembers } = require('./lib/enabledUsers/scimSource')
-
-const J4C_IAS_GROUP = 'SAP_J4C_Enduser';
-
-const J4C_USAGE_SOURCE = {
-  key: 'J4C',
-  iasGroup: J4C_IAS_GROUP,
-  clientId: process.env.J4C_DAS_CLIENT_ID
-};
+const { J4C_IAS_GROUP, USAGE_SOURCE, DEFAULT_DAYS_BACK, MAX_DAYS_BACK } = require('./lib/constants');
 
 module.exports = class J4CService extends cds.ApplicationService {
 
@@ -64,8 +57,8 @@ module.exports = class J4CService extends cds.ApplicationService {
 
     this.on('syncJ4CUsage', async (req) => {
       const n = parseInt(req.data.daysBack, 10);
-      const daysBack = Math.min(Math.max(Number.isNaN(n) ? 3 : n, 1), 90);
-      return usage.runPipeline({ source: J4C_USAGE_SOURCE, daysBack });
+      const daysBack = Math.min(Math.max(Number.isNaN(n) ? DEFAULT_DAYS_BACK : n, 1), MAX_DAYS_BACK);
+      return usage.runPipeline({ source: USAGE_SOURCE, daysBack });
     });
     return super.init();
   }

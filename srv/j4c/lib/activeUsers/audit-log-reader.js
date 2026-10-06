@@ -4,46 +4,43 @@
 // { email, date } "access" facts for one initiative.
 //
 // API (documented for the Cloud Foundry Audit Log Retrieval API):
-//   GET <service key url>/auditlog/v2/auditlogrecords?time_from=...&time_to=...   (UTC, 2018-05-11T10:42:00)
-//   Authorization: Bearer <token from <uaa.url>/oauth/token?grant_type=client_credentials>
+//   GET <base url>/auditlog/v2/auditlogrecords?time_from=...&time_to=...   (UTC, 2018-05-11T10:42:00)
 //   500 records per chunk; the next chunk's handle comes back in the `Paging: handle=<value>` header
 //   and is sent back unchanged as the `handle` query parameter.
 //   Rate limit 4-8 requests/second per token depending on region.
+//
+// The connection comes from a destination (source.auditLogDestination) in the Destination service,
+// type OAuth2ClientCredentials. The Destination service fetches the token; no secret is kept in code.
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const REQUEST_TIMEOUT_MS = 30000;
 const MAX_PAGES = 100;           // safety stop: 100 pages = 50,000 records
 
-// Where the service key comes from, in this order:
-//   AUDITLOG_CREDENTIALS_FILE  path to a JSON file holding the service key (local runs)
-//   AUDITLOG_CREDENTIALS       the same JSON as a string (local runs)
-//   the bound audit log management service (Cloud Foundry)
-function credentials() {
-    if (process.env.AUDITLOG_CREDENTIALS_FILE) {
-        return JSON.parse(require('fs').readFileSync(process.env.AUDITLOG_CREDENTIALS_FILE, 'utf8'));
+// The Destination service fetches the OAuth token and hands it back with the destination.
+async function accessFromDestination(name) {
+    const { getDestination } = require('@sap-cloud-sdk/connectivity');
+    const destination = await getDestination({ destinationName: name });
+    if (!destination) throw new Error(`Audit log destination '${name}' was not found`);
+
+    const token = destination.authTokens && destination.authTokens[0];
+    if (!token || token.error || !token.http_header) {
+        throw new Error(`Audit log destination '${name}' returned no token${token && token.error ? ': ' + token.error : ''}`);
     }
-    if (process.env.AUDITLOG_CREDENTIALS) return JSON.parse(process.env.AUDITLOG_CREDENTIALS);
-    const xsenv = require('@sap/xsenv');
-    return xsenv.serviceCredentials({ label: 'auditlog-management' });
+    return { baseUrl: destination.url.replace(/\/+$/, ''), authorization: token.http_header.value };
 }
 
-async function getToken(creds) {
-    const res = await fetch(`${creds.uaa.url}/oauth/token?grant_type=client_credentials`, {
-        method: 'POST',
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        headers: {
-            Authorization: 'Basic ' + Buffer.from(`${creds.uaa.clientid}:${creds.uaa.clientsecret}`).toString('base64')
-        }
-    });
-    if (!res.ok) throw new Error(`Audit log token request failed: HTTP ${res.status}`);
-    return (await res.json()).access_token;
+async function getAccess(source) {
+    if (!source.auditLogDestination) {
+        throw new Error(`Usage source '${source.key}' has no auditLogDestination`);
+    }
+    return accessFromDestination(source.auditLogDestination);
 }
 
-async function getWithRetry(url, token) {
+async function getWithRetry(url, authorization) {
     for (let attempt = 1; ; attempt++) {
         const res = await fetch(url, {
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { Authorization: authorization },
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
         });
         if (res.status === 429 && attempt < 4) { await sleep(1000 * attempt); continue; }
@@ -55,10 +52,9 @@ async function getWithRetry(url, token) {
 // fromDay / toDay are inclusive UTC days ("YYYY-MM-DD"). Returns every raw record in the window.
 // Stops when there is no next handle, when a page comes back empty, when a handle repeats,
 // or after MAX_PAGES pages, so a paging problem can never loop forever.
-async function fetchRecords(fromDay, toDay) {
-    const creds = credentials();
-    const token = await getToken(creds);
-    const base = `${creds.url}/auditlog/v2/auditlogrecords`;
+async function fetchRecords(source, fromDay, toDay) {
+    const { baseUrl, authorization } = await getAccess(source);
+    const base = `${baseUrl}/auditlog/v2/auditlogrecords`;
     const window = `time_from=${fromDay}T00:00:00&time_to=${toDay}T23:59:59`;
 
     const records = [];
@@ -67,7 +63,7 @@ async function fetchRecords(fromDay, toDay) {
     let page = 0;
     for (;;) {
         const url = handle ? `${base}?${window}&handle=${encodeURIComponent(handle)}` : `${base}?${window}`;
-        const res = await getWithRetry(url, token);
+        const res = await getWithRetry(url, authorization);
         const chunk = await res.json();
         page++;
         const paging = res.headers.get('Paging');
@@ -117,7 +113,7 @@ function extractAccess(record, clientId) {
 }
 
 async function readJouleAccess(source, fromDay, toDay) {
-    const records = await fetchRecords(fromDay, toDay);
+    const records = await fetchRecords(source, fromDay, toDay);
     const accessEvents = [];
     for (const rec of records) {
         const ev = extractAccess(rec, source.clientId);

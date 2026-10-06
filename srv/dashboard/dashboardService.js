@@ -1,5 +1,6 @@
 const cds = require('@sap/cds');
 const { getStatusCriticality, getEnabledUserCount } = require('./lib/dashboard-helpers');
+const db = cds.entities('ai.enablement.dashboard');
 
 module.exports = class DashboardService extends cds.ApplicationService {
     async init() {
@@ -64,6 +65,21 @@ module.exports = class DashboardService extends cds.ApplicationService {
             return { count };
         });
 
+        this.on('resetData', async () => {
+
+            // order matters: DailyAccess and ActiveUserList point to Person, and Person points to Initiative
+            const d = await DELETE.from(db.DailyAccess);
+            const a = await DELETE.from(db.ActiveUserList);
+            const p = await DELETE.from(db.Person);
+            const i = await DELETE.from(db.Initiative);
+
+            return {
+                dailyAccess: Number(d) || 0,
+                activeUsers: Number(a) || 0,
+                persons: Number(p) || 0,
+                initiatives: Number(i) || 0
+            };
+        });
         return super.init();
     }
 };
