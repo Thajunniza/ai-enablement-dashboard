@@ -1,5 +1,5 @@
 {
-  "xsappname": "aiEnablementDashboard",
+  "xsappname": "aiEnablementDashboard-auth",
   "tenant-mode": "dedicated",
   "description": "AI Enablement Dashboard - authorization scopes and role templates",
   "authorities": ["$ACCEPT_GRANTED_AUTHORITIES"],
@@ -18,13 +18,12 @@
     },
     {
       "name": "$XSAPPNAME.JobScheduler",
-      "description": "Scope granted to BTP Job Scheduler service instance",
+      "description": "Granted to the Job Scheduling service instance only, so it can call the sync jobs",
       "grant-as-authority-to-apps": [
         "$XSSERVICENAME(jobscheduler-test)"
       ]
     }
   ],
-  "attributes": [],
   "role-templates": [
     {
       "name": "DashboardViewer",
@@ -47,11 +46,6 @@
         "$XSAPPNAME.DashboardUserDetail",
         "$XSAPPNAME.DashboardAdmin"
       ]
-    },
-    {
-      "name": "JobScheduler",
-      "description": "BTP Job Scheduler service role",
-      "scope-references": ["$XSAPPNAME.JobScheduler"]
     }
   ],
   "role-collections": [

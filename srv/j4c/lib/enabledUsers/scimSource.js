@@ -1,55 +1,67 @@
 'use strict';
+
 const { executeHttpRequest } = require('@sap-cloud-sdk/http-client');
-const { getDestination }     = require('@sap-cloud-sdk/connectivity');
+const { getDestination } = require('@sap-cloud-sdk/connectivity');
+const { SCIM } = require('../constants');
 
-
-async function scimGet(path) {
-  const res = await executeHttpRequest(
-    { destinationName: 'IAS_SCIM' },
-    {
-      method: 'GET',
-      url: path,
-      headers: { Accept: 'application/scim+json' }
+// Runs fn over all items, at most `limit` at a time. The results keep the order of the items.
+async function mapWithLimit(items, limit, fn) {
+    const results = new Array(items.length);
+    let next = 0;
+    async function worker() {
+        while (next < items.length) {
+            const i = next++;
+            results[i] = await fn(items[i]);
+        }
     }
-  );
-  return res.data;
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+    return results;
 }
 
-// Same output shape as the mock: [{ scimId, email, firstName, lastName, active }]
-// Returns REAL identity fields - this project keeps real PII on Person and masks
-// it at read time in dashboardService.js based on role (DashboardViewer sees
-// masked, DashboardUserDetail sees real). No anonymization happens here.
+// Reads the members of one IAS group through the SCIM API (destination IAS_SCIM).
+// Returns [{ scimId, email, firstName, lastName, active }] with the real identity fields.
+// The project keeps real data on Person and masks it when it is read, by role
+// (see dashboardService.js); nothing is anonymised here.
 async function getGroupMembers({ iasGroup } = {}) {
-  const dest = await getDestination({ destinationName: 'IAS_SCIM' });
-  if (!dest) throw new Error('getGroupMembers: IAS_SCIM destination not resolved - check BTP cockpit and cds bind');
+    if (!iasGroup) throw new Error('getGroupMembers: iasGroup is required');
 
-  // 1. Find the group by displayName.
-  const groupSearch = await scimGet(
-    `/scim/Groups?filter=${encodeURIComponent(`displayName eq "${iasGroup}"`)}`
-  );
-  const group = groupSearch.Resources?.[0];
-  if (!group) throw new Error(`getGroupMembers: no SCIM group found named '${iasGroup}'`);
+    // Resolved once, so the Destination service is not asked again for every call
+    const destination = await getDestination({ destinationName: SCIM.DESTINATION_NAME });
+    if (!destination) {
+        throw new Error(`getGroupMembers: destination '${SCIM.DESTINATION_NAME}' not found - check the BTP cockpit`);
+    }
+    const get = async (path) => {
+        const res = await executeHttpRequest(destination, {
+            method: 'GET',
+            url: path,
+            headers: { Accept: SCIM.ACCEPT }
+        });
+        return res.data;
+    };
 
-  // 2. VERIFY against your tenant: fetch the group by ID directly - search
-  //    results sometimes truncate the members array.
-  const fullGroup = await scimGet(`/scim/Groups/${group.id}`);
-  const memberIds = (fullGroup.members || []).map(m => m.value);
+    // 1. Find the group by its name
+    const filter = `displayName eq "${String(iasGroup).replace(/"/g, '\\"')}"`;
+    const search = await get(`${SCIM.GROUPS_PATH}?filter=${encodeURIComponent(filter)}`);
+    const group = search.Resources?.[0];
+    if (!group) throw new Error(`getGroupMembers: no SCIM group found named '${iasGroup}'`);
 
-  // 3. Resolve each member to a full profile.
-  //    VERIFY: one call per user - fine at current headcount, switch to
-  //    GET /scim/Users?filter=groups.value eq "<group.id>" if this grows large.
-  const members = [];
-  for (const id of memberIds) {
-    const user = await scimGet(`/scim/Users/${id}`);
-    members.push({
-      scimId:    user.id,
-      email:     user.emails?.[0]?.value || user.userName,
-      firstName: user.name?.givenName,
-      lastName:  user.name?.familyName,
-      active:    user.active !== false
+    // 2. Read the group itself, because a search result can cut the member list short
+    const fullGroup = await get(`${SCIM.GROUPS_PATH}/${group.id}`);
+    const memberIds = (fullGroup.members || [])
+        .filter((m) => (m.type || 'User') === 'User')     // skip nested groups
+        .map((m) => m.value);
+
+    // 3. One call per member for the full profile, a few at a time
+    return mapWithLimit(memberIds, SCIM.USER_FETCH_CONCURRENCY, async (id) => {
+        const user = await get(`${SCIM.USERS_PATH}/${id}`);
+        return {
+            scimId: user.id,
+            email: user.emails?.[0]?.value || user.userName,
+            firstName: user.name?.givenName,
+            lastName: user.name?.familyName,
+            active: user.active !== false
+        };
     });
-  }
-  return members;
 }
 
 module.exports = { getGroupMembers };

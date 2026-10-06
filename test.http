@@ -2,16 +2,18 @@
 # AI Enablement Dashboard — CAP OData V4 Test Suite
 # Run with: VS Code REST Client extension
 # Server  : cds watch (local, mocked auth)
+# Every request now needs a login. The job endpoints (/J4C) need admin; the screens' endpoints
+# (/dashboard) need viewer or admin. Section E checks the role rules and the masking.
 #
 # Services
 #   DashboardService  /dashboard   read side, used by the screens
 #   J4CService        /J4C         jobs for the J4C initiative (SCIM sync, usage sync)
 #
 # Auth    : mocked users defined in .cdsrc.json
-#           admin / admin   → DashboardAdmin
-#           viewer / viewer → DashboardViewer
+#           admin / admin   → DashboardAdmin and DashboardUserDetail (sees real names and emails)
+#           viewer / viewer → DashboardViewer only (sees masked names and emails)
 #
-# Expected values below assume the test CSVs I generated:
+# Expected values below assume the sample CSVs (one-off test data, not real people):
 #   Person.csv           15 persons (J4C has 13: 11 active, 2 inactive)
 #   ActiveUserList.csv   164 roster rows
 # Do NOT run the SCIM sync (section C) on top of those test CSVs: the test users
@@ -53,8 +55,9 @@ Authorization: {{adminAuth}}
 
 
 # 3. CREATE INITIATIVE
-# Expected: 201 Created
-### Create new initiative
+# Expected: 405 Method Not Allowed. Initiatives are read-only in this service (they come
+#           from the seed data), so even an admin cannot create one here.
+### Create new initiative, even admin gets 405
 POST {{baseUrl}}/Initiatives
 Authorization: {{adminAuth}}
 Content-Type: application/json
@@ -69,9 +72,8 @@ Content-Type: application/json
 
 
 # 4. CREATE INITIATIVE AS VIEWER
-# Expected: 403 Forbidden, but only once @restrict is switched back on.
-#           Until then this returns 201 (authorization is planned for later).
-### Create initiative as viewer — 403 once @restrict is on
+# Expected: 403 or 405. The service is read-only for everybody, so no role can create here.
+### Create initiative as viewer — expect 403/405
 POST {{baseUrl}}/Initiatives
 Authorization: {{viewerAuth}}
 Content-Type: application/json
@@ -148,7 +150,7 @@ Authorization: {{viewerAuth}}
 
 
 # 13. TREND COUNTS, invalid grain
-# Expected: 400 Bad Request, "Invalid grain: DAILY. Must be WEEKLY, MONTHLY or YEARLY."
+# Expected: 400 Bad Request, "Invalid grain: DAILY. Must be WEEKLY, MONTHLY, YEARLY."
 ### Trend counts — invalid grain, expect 400
 GET {{baseUrl}}/getTrendCounts(grain='DAILY',initiativeId={{initiativeId1}})
 Authorization: {{viewerAuth}}
@@ -208,75 +210,126 @@ Authorization: {{viewerAuth}}
 
 
 # 21. NO CREDENTIALS
-# Expected: 401 Unauthorized, but only once authentication is switched back on.
-### No credentials — 401 once authentication is on
+# Expected: 401 Unauthorized
+### No credentials — expect 401
 GET {{baseUrl}}/Initiatives
 
-# 22. CLEAR DB
-###
-POST {{baseUrl}}/resetData
-Content-Type: application/json
 
-{}
 # ═════════════════════════════════════════════════════════════════════════════
-# C. J4C USER SYNC (SCIM job). Skip these if you loaded the test CSVs.
+# C. J4C USER SYNC (SCIM job, admin only). Skip these if you loaded the test CSVs.
 # ═════════════════════════════════════════════════════════════════════════════
 
 ### C1. Check current Person state
 GET {{baseUrl}}/Persons
+Authorization: {{viewerAuth}}
 
 ### C2. Trigger the J4C user sync
 # Expected: 200 OK, { created, reactivated, deactivated }
 POST {{jobUrl}}/syncJ4CUsers
+Authorization: {{adminAuth}}
 Content-Type: application/json
 
 {}
 
 ### C3. Check Person state after the sync
 GET {{baseUrl}}/Persons
+Authorization: {{viewerAuth}}
 
 ### C4. Run the sync again, it must be idempotent
 # Expected: created:0, reactivated:0, deactivated:0
 POST {{jobUrl}}/syncJ4CUsers
+Authorization: {{adminAuth}}
 Content-Type: application/json
 
 {}
 
 ### C5. Initiatives again, the enabledUsers count should match the active persons
 GET {{baseUrl}}/Initiatives
+Authorization: {{viewerAuth}}
 
 
 # ═════════════════════════════════════════════════════════════════════════════
 # D. J4C USAGE SYNC (audit log -> DailyAccess -> ActiveUserList -> cleanup)
 # ═════════════════════════════════════════════════════════════════════════════
 
-### D1. First wiring check, before J4C_DAS_CLIENT_ID is set
-# Expected: 500 with "Usage source 'J4C' has no clientId ..."
-# This message shows the call reached the pipeline.
-POST {{jobUrl}}/syncJ4CUsage
-Content-Type: application/json
-
-{}
-
-### D2. Normal daily run (needs J4C_DAS_CLIENT_ID and the audit log binding)
+### D1. Daily run: reads yesterday only (what the scheduled job sends)
 # Expected: 200 OK, { scanned, accessEvents, matched, unmatchedUsers, rosterRows, cleaned }
+# accessEvents is 0 if nobody signed in to Joule yesterday.
 POST {{jobUrl}}/syncJ4CUsage
+Authorization: {{adminAuth}}
 Content-Type: application/json
 
 {}
+
+### D2. Last 3 days including today (to see a sign-in you just made)
+# Expected: 200 OK, same shape as D1
+POST {{jobUrl}}/syncJ4CUsage
+Authorization: {{adminAuth}}
+Content-Type: application/json
+
+{ "daysBack": 3 }
 
 ### D3. First run only: backfill the 90-day retention window
 POST {{jobUrl}}/syncJ4CUsage
+Authorization: {{adminAuth}}
 Content-Type: application/json
 
 { "daysBack": 90 }
 
-### D4. Run D2 twice in a row, it must be idempotent
+### D4. Run D1 twice in a row, it must be idempotent
 # Expected: the second run gives the same matched count, and ActiveUsers has no new rows
 POST {{jobUrl}}/syncJ4CUsage
+Authorization: {{adminAuth}}
 Content-Type: application/json
 
 {}
 
 ### D5. After a run, check the roster grew with real data
 GET {{baseUrl}}/ActiveUsers?$filter=person_initiative_ID eq {{initiativeId1}}&$orderby=periodLabel desc&$top=20
+Authorization: {{viewerAuth}}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# E. ACCESS RULES AND MASKING
+# Local mocked users (.cdsrc.json): admin needs the roles DashboardAdmin and
+# DashboardUserDetail, viewer only DashboardViewer. In BTP the Admin role template
+# already includes the other two scopes.
+# ═════════════════════════════════════════════════════════════════════════════
+
+### E1. Viewer reads persons: names and emails are masked
+# Expected: 200 OK, displayName like "J*** D***", email like "j***@example.com"
+GET {{baseUrl}}/Persons?$top=3
+Authorization: {{viewerAuth}}
+
+### E2. Admin reads persons: real values
+# Expected: 200 OK, real names and emails (needs DashboardUserDetail on the admin user)
+GET {{baseUrl}}/Persons?$top=3
+Authorization: {{adminAuth}}
+
+### E3. Viewer reads the roster with the person expanded: masked as well
+# Expected: 200 OK, person.displayName and person.email masked
+GET {{baseUrl}}/ActiveUsers?$top=3&$expand=person
+Authorization: {{viewerAuth}}
+
+### E4. Viewer tries to start a job
+# Expected: 403 Forbidden
+POST {{jobUrl}}/syncJ4CUsage
+Authorization: {{viewerAuth}}
+Content-Type: application/json
+
+{}
+
+### E5. No credentials on a job
+# Expected: 401 Unauthorized
+POST {{jobUrl}}/syncJ4CUsage
+Content-Type: application/json
+
+{}
+
+### E6. The old reset endpoints are gone
+# Expected: 404 Not Found
+POST {{baseUrl}}/resetData
+Authorization: {{adminAuth}}
+Content-Type: application/json
+
+{}

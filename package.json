@@ -55,20 +55,19 @@
         "auth": {
           "kind": "mocked",
           "users": {
-            "admin": {
-              "password": "admin",
-              "roles": [
-                "DashboardViewer",
-                "DashboardAdmin"
-              ]
-            },
-            "viewer": {
-              "password": "viewer",
-              "roles": [
-                "DashboardViewer"
-              ]
-            }
+          "admin": {
+            "password": "admin",
+            "roles": ["DashboardViewer", "DashboardUserDetail", "DashboardAdmin"]
+          },
+          "detail": {
+            "password": "detail",
+            "roles": ["DashboardViewer", "DashboardUserDetail"]
+          },
+          "viewer": {
+            "password": "viewer",
+            "roles": ["DashboardViewer"]
           }
+        }
         }
       }
     }

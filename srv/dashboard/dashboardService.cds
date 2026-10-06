@@ -1,13 +1,17 @@
 using {ai.enablement.dashboard as db} from '../../db/schema';
 
-@path: '/dashboard'
+// Every request needs at least the DashboardViewer scope.
+// The UserDetail and Admin role templates include it (see xs-security.json),
+// so this one check covers all three roles.
+@path    : '/dashboard'
+@requires: 'DashboardViewer'
 service DashboardService {
 
-  // @restrict: [ { grant: 'READ', to: 'DashboardViewer' } ]
   @readonly
   entity Initiatives as projection on db.Initiative;
 
-  // @restrict: [ { grant: 'READ', to: 'DashboardViewer' } ]
+  // Names and emails are masked in dashboardService.js
+  // unless the user also has the DashboardUserDetail scope.
   @readonly
   entity Persons     as
     projection on db.Person {
@@ -15,41 +19,20 @@ service DashboardService {
       initiative.name as initiativeName : String
     };
 
-  // @restrict: [
-  //   { grant: ['READ'], to: ['DashboardViewer', 'DashboardAdmin'] }
-  // ]
+  // Rows carry the person association; the same masking applies there.
   @readonly
   entity ActiveUsers as projection on db.ActiveUserList;
 
-  // ── Trend chart aggregation action ────────────────────────────────────────
-  // Returns COUNT DISTINCT per (periodLabel, grain) for the trend chart KPI.
-  // Implemented in dashboard-service.js — never hits the DB with a raw query.
-  // grain values: WEEKLY | MONTHLY | YEARLY
-  // WEEKLY and YEARLY results carry isEstimated: true — labeled in UI.
-  // ─────────────────────────────────────────────────────────────────────────
-  // @restrict: [
-  //   { grant: ['EXECUTE'], to: ['DashboardViewer', 'DashboardAdmin'] }
-  // ]
+  // Number of distinct active users per (periodLabel, grain) for the trend chart.
+  // grain: WEEKLY | MONTHLY | YEARLY. initiativeId is optional (all initiatives when omitted).
   function getTrendCounts(grain: String(10), initiativeId: UUID) returns array of {
-  periodLabel : String(10);
-  grain       : String(10);
-  activeCount : Integer;
-};
-
-  // ── Enabled user count action ─────────────────────────────────────────────
-  // Returns COUNT of active Person records for a given Initiative.
-  // Used to populate the enabledUsers KPI tile on Screen 2.
-  // Reads from Person (PII table) server-side only — count only, no PII out.
-  // ─────────────────────────────────────────────────────────────────────────
-  // @restrict: [
-  //   { grant: ['EXECUTE'], to: ['DashboardViewer', 'DashboardAdmin'] }
-  // ]
-  function getEnabledUserCount(initiativeId: UUID) returns {
-    count : Integer;
+    periodLabel : String(10);
+    grain       : String(10);
+    activeCount : Integer;
   };
 
-  // Reset data
-  action resetData() returns { dailyAccess : Integer; activeUsers : Integer; persons : Integer; initiatives : Integer };
-
-
+  // Number of active Person records of one initiative (KPI tile). Count only, no personal data.
+  function getEnabledUserCount(initiativeId: UUID)               returns {
+    count : Integer;
+  };
 }

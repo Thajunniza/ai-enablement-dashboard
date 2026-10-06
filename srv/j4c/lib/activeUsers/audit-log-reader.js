@@ -7,15 +7,19 @@
 //   GET <base url>/auditlog/v2/auditlogrecords?time_from=...&time_to=...   (UTC, 2018-05-11T10:42:00)
 //   500 records per chunk; the next chunk's handle comes back in the `Paging: handle=<value>` header
 //   and is sent back unchanged as the `handle` query parameter.
-//   Rate limit 4-8 requests/second per token depending on region.
 //
 // The connection comes from a destination (source.auditLogDestination) in the Destination service,
 // type OAuth2ClientCredentials. The Destination service fetches the token; no secret is kept in code.
+// Timeouts, limits and the event type are in ../constants.js.
+
+const cds = require('@sap/cds');
+const { AUDIT_LOG } = require('../constants');
+
+// Page-by-page progress is logged at debug level, so it is silent by default.
+// To see it, set "cds": { "log": { "levels": { "audit-log": "debug" } } } in package.json.
+const LOG = cds.log('audit-log');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-const REQUEST_TIMEOUT_MS = 30000;
-const MAX_PAGES = 100;           // safety stop: 100 pages = 50,000 records
 
 // The Destination service fetches the OAuth token and hands it back with the destination.
 async function accessFromDestination(name) {
@@ -39,49 +43,70 @@ async function getAccess(source) {
 
 async function getWithRetry(url, authorization) {
     for (let attempt = 1; ; attempt++) {
-        const res = await fetch(url, {
-            headers: { Authorization: authorization },
-            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
-        });
-        if (res.status === 429 && attempt < 4) { await sleep(1000 * attempt); continue; }
-        if (!res.ok) throw new Error(`Audit log retrieval failed: HTTP ${res.status}`);
+        let res;
+        try {
+            res = await fetch(url, {
+                headers: { Authorization: authorization },
+                signal: AbortSignal.timeout(AUDIT_LOG.REQUEST_TIMEOUT_MS)
+            });
+        } catch (err) {
+            if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+                throw new Error(`Audit log request timed out after ${AUDIT_LOG.REQUEST_TIMEOUT_MS} ms`);
+            }
+            throw err;
+        }
+
+        if (res.status === 429 && attempt < AUDIT_LOG.MAX_ATTEMPTS) {
+            await sleep(AUDIT_LOG.RETRY_BACKOFF_MS * attempt);
+            continue;
+        }
+        if (!res.ok) {
+            const hint = res.status === 401 || res.status === 403
+                ? ' (check the destination login and the audit log service key)'
+                : '';
+            throw new Error(`Audit log retrieval failed: HTTP ${res.status}${hint}`);
+        }
         return res;
     }
 }
 
-// fromDay / toDay are inclusive UTC days ("YYYY-MM-DD"). Returns every raw record in the window.
-// Stops when there is no next handle, when a page comes back empty, when a handle repeats,
-// or after MAX_PAGES pages, so a paging problem can never loop forever.
-async function fetchRecords(source, fromDay, toDay) {
+// Yields the records of the window one page at a time, so a long window never has to sit in
+// memory. fromDay / toDay are inclusive UTC days ("YYYY-MM-DD").
+// Ends when there is no next handle, when a page is empty or when a handle repeats.
+// Throws when the window needs more than MAX_PAGES pages, because carrying on with
+// partial data would quietly under-count.
+async function* fetchPages(source, fromDay, toDay) {
     const { baseUrl, authorization } = await getAccess(source);
-    const base = `${baseUrl}/auditlog/v2/auditlogrecords`;
-    const window = `time_from=${fromDay}T00:00:00&time_to=${toDay}T23:59:59`;
+    const base = `${baseUrl}${AUDIT_LOG.API_PATH}`;
+    const range = `time_from=${fromDay}T00:00:00&time_to=${toDay}T23:59:59`;
 
-    const records = [];
     const seen = new Set();
     let handle = null;
-    let page = 0;
-    for (;;) {
-        const url = handle ? `${base}?${window}&handle=${encodeURIComponent(handle)}` : `${base}?${window}`;
+    for (let page = 1; ; page++) {
+        const url = handle ? `${base}?${range}&handle=${encodeURIComponent(handle)}` : `${base}?${range}`;
         const res = await getWithRetry(url, authorization);
         const chunk = await res.json();
-        page++;
+        if (!Array.isArray(chunk)) {
+            throw new Error('Audit log retrieval returned an unexpected answer (expected a list of records)');
+        }
+
         const paging = res.headers.get('Paging');
-        console.log(`[audit-log] page ${page}: ${Array.isArray(chunk) ? chunk.length : 'not an array'} records, Paging header ${paging ? 'present' : 'absent'}`);
-        if (Array.isArray(chunk)) records.push(...chunk);
+        LOG.debug(`page ${page}: ${chunk.length} records, Paging header ${paging ? 'present' : 'absent'}`);
+        yield chunk;
 
         const m = paging && /handle=(.+)/.exec(paging);
         const next = m ? m[1] : null;
-        if (!next || !Array.isArray(chunk) || chunk.length === 0 || seen.has(next)) break;
-        if (page >= MAX_PAGES) {
-            console.warn(`[audit-log] stopped after ${MAX_PAGES} pages; the window may hold more records`);
-            break;
+        if (!next || chunk.length === 0 || seen.has(next)) return;
+        if (page >= AUDIT_LOG.MAX_PAGES) {
+            throw new Error(
+                `Audit log window ${fromDay} to ${toDay} needs more than ${AUDIT_LOG.MAX_PAGES} pages. ` +
+                'Use a shorter window, or raise AUDIT_LOG.MAX_PAGES in constants.js.'
+            );
         }
         seen.add(next);
         handle = next;
-        await sleep(150);
+        await sleep(AUDIT_LOG.PAGE_DELAY_MS);
     }
-    return records;
 }
 
 function parseMaybeJson(value) {
@@ -98,7 +123,7 @@ function extractAccess(record, clientId) {
     const outer = parseMaybeJson(record && record.message);
     const data = outer && parseMaybeJson(outer.data);
     const text = data && data.message;
-    if (typeof text !== 'string' || !text.startsWith('TokenIssuedEvent')) return null;
+    if (typeof text !== 'string' || !text.startsWith(AUDIT_LOG.TOKEN_EVENT_PREFIX)) return null;
 
     const client = /"client_id":"([^"]+)"/.exec(text);
     if (!client || client[1] !== clientId) return null;
@@ -112,14 +137,19 @@ function extractAccess(record, clientId) {
     return { email, date };
 }
 
+// Reads the window and keeps only the sign-ins of this source's application.
+// scanned = every record looked at, accessEvents = the sign-ins that count.
 async function readJouleAccess(source, fromDay, toDay) {
-    const records = await fetchRecords(source, fromDay, toDay);
+    let scanned = 0;
     const accessEvents = [];
-    for (const rec of records) {
-        const ev = extractAccess(rec, source.clientId);
-        if (ev && ev.date >= fromDay && ev.date <= toDay) accessEvents.push(ev);
+    for await (const chunk of fetchPages(source, fromDay, toDay)) {
+        scanned += chunk.length;
+        for (const rec of chunk) {
+            const ev = extractAccess(rec, source.clientId);
+            if (ev && ev.date >= fromDay && ev.date <= toDay) accessEvents.push(ev);
+        }
     }
-    return { scanned: records.length, accessEvents };
+    return { scanned, accessEvents };
 }
 
-module.exports = { fetchRecords, extractAccess, readJouleAccess };
+module.exports = { extractAccess, readJouleAccess };

@@ -2,7 +2,7 @@
 
 const { labelsFor } = require('./period-labels');
 
-const GRAINS = ['WEEKLY', 'MONTHLY', 'YEARLY'];
+const GRAINS = Object.freeze(['WEEKLY', 'MONTHLY', 'YEARLY']);
 
 function key(grain, periodLabel, scimId, initiativeId) {
     return [grain, periodLabel, scimId, initiativeId].join('|');

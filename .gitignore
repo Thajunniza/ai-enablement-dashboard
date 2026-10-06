@@ -1,23 +1,47 @@
+# Dependencies
 node_modules/
+
+# CAP build artifacts
 target/
 _out/
 gen/
-resources/
+.gen/
 
+# UI5 build output
+resources/
+dist/
+
+# CAP typer
+@cds-models/
+
+# Sensitive / local config
 .cdsrc-private.json
 default-*.json
-*.sqlite
 .env
+.env.local
+.env.*.local
 
-# MTA
+# Local DB
+*.sqlite
+*.db
+
+# MTA / deployment
 mta_archives/
 *_mta_build_tmp
 *.mtar
+*.daar
 
-# Other
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+._*
 
-# @cap-js/cds-typer
-@cds-models
-.gen
-.vscode
+# Logs
+*.log
+npm-debug.log*

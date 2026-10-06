@@ -1,36 +1,44 @@
+'use strict';
+
 const cds = require('@sap/cds');
-const { getStatusCriticality, getEnabledUserCount } = require('./lib/dashboard-helpers');
-const db = cds.entities('ai.enablement.dashboard');
+const { getStatusCriticality, getEnabledUserCount, getEnabledUserCounts } = require('./lib/dashboard-helpers');
+const { maskPerson } = require('./lib/mask');
+const { NAMESPACE, ROLES } = require('../shared/constants');
+const { GRAINS } = require('../shared/roster');
 
 module.exports = class DashboardService extends cds.ApplicationService {
     async init() {
+        const { ActiveUserList } = cds.entities(NAMESPACE);
 
-        const { ActiveUserList } = cds.entities('ai.enablement.dashboard');
-
-        // ── Virtual fields — after READ Initiatives ───────────────────────────────
-        // Calls shared getEnabledUserCount helper — same function used by KPI action
+        // ── Initiatives: computed fields ──────────────────────────────────────────
         this.after('READ', 'Initiatives', async (initiatives) => {
-            if (!initiatives || initiatives.length === 0) return;
-
-            const rows = Array.isArray(initiatives) ? initiatives : [initiatives];
-
+            const rows = [].concat(initiatives || []);
+            const counts = await getEnabledUserCounts(rows.map((row) => row.ID));   // one query for all
             for (const initiative of rows) {
-                // Shared helper — no duplicate DB query logic
-                initiative.enabledUsers = await getEnabledUserCount(initiative.ID);
+                initiative.enabledUsers = counts.get(initiative.ID) ?? 0;
                 initiative.statusCriticality = getStatusCriticality(initiative.status);
             }
         });
 
-        const VALID_GRAINS = ['WEEKLY', 'MONTHLY', 'YEARLY'];
+        // ── Masking: real names and emails only for DashboardUserDetail ───────────
+        this.after('READ', 'Persons', (rows, req) => {
+            if (req.user.is(ROLES.USER_DETAIL)) return;
+            [].concat(rows || []).forEach(maskPerson);
+        });
 
+        // ActiveUsers rows can carry the person (via $expand=person), so mask that too.
+        this.after('READ', 'ActiveUsers', (rows, req) => {
+            if (req.user.is(ROLES.USER_DETAIL)) return;
+            [].concat(rows || []).forEach((row) => row && maskPerson(row.person));
+        });
+
+        // ── Trend chart: distinct active users per period ─────────────────────────
         this.on('getTrendCounts', async (req) => {
             const grain = req.data.grain?.toUpperCase();
             const { initiativeId } = req.data;
-            if (grain && !VALID_GRAINS.includes(grain)) {
-                return req.reject(400, `Invalid grain: ${req.data.grain}. Must be WEEKLY, MONTHLY or YEARLY.`);
+            if (grain && !GRAINS.includes(grain)) {
+                return req.reject(400, `Invalid grain: ${req.data.grain}. Must be ${GRAINS.join(', ')}.`);
             }
-
-            const { ActiveUserList } = cds.entities('ai.enablement.dashboard');
 
             const where = {};
             if (grain) where.grain = grain;
@@ -40,46 +48,23 @@ module.exports = class DashboardService extends cds.ApplicationService {
                 .columns('periodLabel', 'grain', 'count(1) as activeCount')
                 .groupBy('periodLabel', 'grain')
                 .orderBy('grain', 'periodLabel');
-
             if (Object.keys(where).length) query.where(where);
 
             const rows = await cds.run(query);
-
-            return rows.map(r => ({
+            return rows.map((r) => ({
                 periodLabel: r.periodLabel,
                 grain: r.grain,
                 activeCount: Number(r.activeCount)
             }));
         });
 
-        // ── getEnabledUserCount — KPI tile function action ────────────────────────
-        // Delegates entirely to shared helper — zero duplication
+        // ── KPI tile: number of enabled users of one initiative ───────────────────
         this.on('getEnabledUserCount', async (req) => {
             const { initiativeId } = req.data;
-
-            if (!initiativeId) {
-                return req.error(400, 'initiativeId is required.');
-            }
-
-            const count = await getEnabledUserCount(initiativeId);
-            return { count };
+            if (!initiativeId) return req.reject(400, 'initiativeId is required.');
+            return { count: await getEnabledUserCount(initiativeId) };
         });
 
-        this.on('resetData', async () => {
-
-            // order matters: DailyAccess and ActiveUserList point to Person, and Person points to Initiative
-            const d = await DELETE.from(db.DailyAccess);
-            const a = await DELETE.from(db.ActiveUserList);
-            const p = await DELETE.from(db.Person);
-            const i = await DELETE.from(db.Initiative);
-
-            return {
-                dailyAccess: Number(d) || 0,
-                activeUsers: Number(a) || 0,
-                persons: Number(p) || 0,
-                initiatives: Number(i) || 0
-            };
-        });
         return super.init();
     }
 };
