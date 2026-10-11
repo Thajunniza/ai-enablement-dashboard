@@ -4,25 +4,13 @@
     xmlns="sap.m"
     xmlns:l="sap.ui.layout"
     xmlns:f="sap.f"
-    xmlns:card="sap.f.cards"
-    xmlns:cssgrid="sap.ui.layout.cssgrid"
     xmlns:macros="sap.fe.macros"
-    xmlns:html="http://www.w3.org/1999/xhtml"
     controllerName="com.sap.aiinitiativesoverview.ext.view.Main">
 
     <macros:Page
         id="Page"
         title="{i18n>app_title}"
         showFooter="false">
-
-        <macros:actions>
-            <Button
-                id="addInitiativeBtn"
-                text="{i18n>btn_addInitiative}"
-                type="Emphasized"
-                icon="sap-icon://add"
-                press=".onAddInitiative" />
-        </macros:actions>
 
         <macros:headerContent>
             <VBox id="headerContentBox">
@@ -43,6 +31,7 @@
                 sideContentWidthL="260px"
                 sideContentWidthXL="280px">
 
+                <!-- Filter bar. The controls are in place; the handlers are placeholders until phase 2. -->
                 <l:sideContent>
                     <VBox id="filterPanel" class="aiedFilterPanel">
 
@@ -50,7 +39,6 @@
                             id="initiativeSearchField"
                             placeholder="{i18n>filter_search_placeholder}"
                             search=".onSearchInitiatives"
-                            liveChange=".onSearchInitiatives"
                             class="aiedFilterSearch" />
 
                         <Title
@@ -63,9 +51,22 @@
                             mode="SingleSelectMaster"
                             selectionChange=".onStatusFilterChange"
                             class="aiedFilterStatusList aiedFilterSectionGap">
-                            <StandardListItem id="statusFacetAll" title="{i18n>filter_all}" />
-                            <StandardListItem id="statusFacetLive" title="{i18n>filter_live}" />
-                            <StandardListItem id="statusFacetComingSoon" title="{i18n>filter_comingSoon}" />
+                            <!-- The key in customData is what the logic will read, not the translated title -->
+                            <StandardListItem id="statusFacetAll" title="{i18n>filter_all}">
+                                <customData>
+                                    <core:CustomData key="status" value="" />
+                                </customData>
+                            </StandardListItem>
+                            <StandardListItem id="statusFacetLive" title="{i18n>filter_live}">
+                                <customData>
+                                    <core:CustomData key="status" value="Live" />
+                                </customData>
+                            </StandardListItem>
+                            <StandardListItem id="statusFacetComingSoon" title="{i18n>filter_comingSoon}">
+                                <customData>
+                                    <core:CustomData key="status" value="ComingSoon" />
+                                </customData>
+                            </StandardListItem>
                         </List>
 
                         <Title
@@ -102,7 +103,7 @@
                         <f:layout>
                             <f:GridContainerSettings columnSize="20rem" rowSize="auto" gap="1.5rem" />
                         </f:layout>
-                        <f:items >
+                        <f:items>
                             <VBox id="initiativeCard" class="aiedCard">
 
                                 <FlexBox
@@ -114,15 +115,16 @@
                                     <ObjectIdentifier
                                         id="initiativeTitle"
                                         title="{name}"
-                                        titleActive="true"
+                                        titleActive="{path: 'status', formatter: '.formatter.isLive'}"
                                         titlePress=".onSelectProduct"
                                         class="aiedCardTitle" />
                                     <ObjectStatus
                                         id="initiativeStatus"
-                                        text="{status}"
+                                        text="{path: 'status', formatter: '.formatter.statusText'}"
                                         inverted="true"
-                                        state="{= %{statusCriticality} === 3 ? 'Indication16' : 'Indication13' }" />
+                                        state="{path: 'status', formatter: '.formatter.statusState'}" />
                                 </FlexBox>
+
                                 <FlexBox
                                     id="initiativeTitleRow2"
                                     justifyContent="SpaceBetween"
@@ -131,13 +133,13 @@
                                     class="sapUiTinyMarginBottom">
                                     <Text
                                         id="initiativeOwner"
-                                        text="{= ${owner} ? ('Owner: ' + ${owner}) : '' }"
+                                        text="{= ${owner} ? (${i18n>card_owner} + ' ' + ${owner}) : '' }"
                                         class="aiedCardOwner sapUiTinyMarginBottom" />
                                     <HBox
                                         id="launchDateRow"
                                         alignItems="Center"
                                         class="aiedCardOwner sapUiTinyMarginTop"
-                                        visible="{= %{statusCriticality} === 3 }">
+                                        visible="{path: 'status', formatter: '.formatter.isLive'}">
                                         <core:Icon
                                             id="launchDateIcon"
                                             src="sap-icon://calendar"
@@ -148,6 +150,7 @@
                                             text="{launchDate}" />
                                     </HBox>
                                 </FlexBox>
+
                                 <VBox
                                     id="enabledUsersBox"
                                     class="aiedDivider sapUiTinyMarginBottom">
@@ -171,7 +174,7 @@
                                     text="{i18n>card_viewDetails}"
                                     press=".onSelectProduct"
                                     class="aiedViewDetails sapUiSmallMarginTop"
-                                    visible="{= %{statusCriticality} === 3 }" />
+                                    visible="{path: 'status', formatter: '.formatter.isLive'}" />
 
                             </VBox>
                         </f:items>

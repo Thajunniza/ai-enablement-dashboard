@@ -3,180 +3,214 @@ sap.ui.define([
     "sap/ui/model/json/JSONModel",
     "sap/ui/model/Filter",
     "sap/ui/model/FilterOperator",
-    "sap/m/MessageToast",
-    "sap/ui/core/routing/History"
-], function (PageController, JSONModel, Filter, FilterOperator, MessageToast, History) {
+    "sap/ui/core/routing/History",
+    "sap/base/Log",
+    "../util/constants",
+    "../util/formatter",
+    "../util/service",
+    "../util/messages"
+], function (PageController, JSONModel, Filter, FilterOperator, History, Log, constants, formatter, service, messages) {
     "use strict";
 
-    var ENABLED = "ENABLED";
-    var ACTIVE = "ACTIVE";
-    var SELECTED_CLASS = "aiedKpiCardSelected";
+    const {
+        ROUTES, MODELS, GRAIN, DEFAULT_GRAIN, LIST_MODE, ODATA, MAX_LIST_ROWS,
+        SAFE_ID_PATTERN, CHART_PERIOD_DIMENSION, SELECTED_CARD_CLASS, LOG_COMPONENT
+    } = constants;
+
+    // The values the detail page starts with, and goes back to for every new initiative
+    function defaultDetail() {
+        return {
+            name: "",
+            status: "",
+            owner: "",
+            launchDate: null,
+            iasGroup: "",
+            enabledUsersCount: 0,
+            activeUsersCount: 0,
+            listMode: LIST_MODE.ENABLED,
+            listPeriod: "",          // period shown in the list subtitle
+            listCount: 0,
+            listBusy: false
+        };
+    }
 
     return PageController.extend("com.sap.aiinitiativesoverview.ext.controller.Detail", {
 
-        onInit: function () {
+        // Used in the view as .formatter.<name>
+        formatter,
+
+        onInit() {
             PageController.prototype.onInit.apply(this, arguments);
 
             this._sInitiativeId = null;
-            this._sGrain = "MONTHLY";
+            this._sGrain = DEFAULT_GRAIN;
             this._sLatestMonthly = "";
-            this._iListReq = 0;          // guards against out-of-order list responses
-            this._iDeselectTimer = null;
+            this._iRouteReq = 0;      // changes on every route match: late answers for an old initiative are dropped
+            this._iListReq = 0;       // same idea for the user list: only the newest request may fill it
             this._bCardsWired = false;
 
-            this.oRouter = this.getAppComponent().getRouter();
-            this.oRouter
-                .getRoute("InitiativeDetail")
-                .attachPatternMatched(this._onRouteMatched, this);
+            this._oRoute = this.getAppComponent().getRouter().getRoute(ROUTES.INITIATIVE_DETAIL);
+            this._oRoute.attachPatternMatched(this._onRouteMatched, this);
 
-            this.getView().setModel(new JSONModel({
-                name: "",
-                status: "",
-                statusCriticality: 0,
-                owner: "",
-                launchDate: "",
-                iasGroup: "",
-                enabledUsersCount: 0,
-                activeUsersCount: 0,
-                maskingNote: "",
-                listMode: ENABLED,       // ENABLED | ACTIVE
-                listPeriod: "",          // period label shown in the list subtitle
-                listCount: 0,
-                listBusy: false
-            }), "detailModel");
+            const oView = this.getView();
+            oView.setModel(new JSONModel(defaultDetail()), MODELS.DETAIL);
+            oView.setModel(new JSONModel({ results: [] }), MODELS.TREND);
+            oView.setModel(new JSONModel([]), MODELS.USER_LIST);
 
-            this.getView().setModel(new JSONModel({ results: [] }), "trendModel");
-            this.getView().setModel(new JSONModel([]), "userListModel");
-
-            // Wire the KPI cards once the view has rendered
-            this.getView().addEventDelegate({ onAfterRendering: this._wireCards }, this);
+            // The KPI cards are plain boxes: they are made clickable once the view has rendered
+            oView.addEventDelegate({ onAfterRendering: this._wireCards }, this);
         },
 
-        _onRouteMatched: function (oEvent) {
-            var that = this;
-            this._sInitiativeId = oEvent.getParameter("arguments").initiativeId;
-            this._sGrain = "MONTHLY";
+        onExit() {
+            this._oRoute.detachPatternMatched(this._onRouteMatched, this);
+            if (PageController.prototype.onExit) {
+                PageController.prototype.onExit.apply(this, arguments);
+            }
+        },
+
+        _onRouteMatched(oEvent) {
+            const sId = oEvent.getParameter("arguments").initiativeId;
+
+            // The id goes into an OData path below, so a hand-edited URL must not get through
+            if (!SAFE_ID_PATTERN.test(sId || "")) {
+                Log.error("Invalid initiative id in the URL", "", LOG_COMPONENT);
+                messages.show(this.getView(), "msg_invalid_initiative");
+                this.getAppComponent().getRouter().navTo(ROUTES.MAIN, {}, true);
+                return;
+            }
+
+            const iRoute = ++this._iRouteReq;
+            this._sInitiativeId = sId;
+            this._sGrain = DEFAULT_GRAIN;
             this._sLatestMonthly = "";
 
-            var oToggle = this.byId("grainToggle");
-            if (oToggle) { oToggle.setSelectedKey("MONTHLY"); }
+            // Start clean, so nothing from the previous initiative is shown while this one loads
+            this._detail().setData(defaultDetail());
+            this.getView().getModel(MODELS.TREND).setData({ results: [] });
+            this.getView().getModel(MODELS.USER_LIST).setData([]);
+            const oToggle = this.byId("grainToggle");
+            if (oToggle) {
+                oToggle.setSelectedKey(DEFAULT_GRAIN);
+            }
 
-            this._detail().setProperty("/activeUsersCount", 0);
-            this.getView().getModel("userListModel").setData([]);
-
-            this._loadInitiative(this._sInitiativeId);
-            this._loadEnabledUserCount(this._sInitiativeId);
-            this._showEnabledList();     // default list
+            this._loadInitiative(sId, iRoute);
+            this._loadEnabledUserCount(sId, iRoute);
+            this._showEnabledList();
             this._wireCards();
-
-            // Trend first (gives the latest monthly period), then the scoped Active users KPI
-            this._loadTrendCounts("MONTHLY").then(function (aResults) {
-                that._sLatestMonthly = aResults.length ? aResults[aResults.length - 1].periodLabel : "";
-                if (!that._sLatestMonthly) { return null; }
-                return that._fetchActiveRoster("MONTHLY", that._sLatestMonthly).then(function (aRows) {
-                    that._detail().setProperty("/activeUsersCount", aRows.length);
-                });
-            }).catch(function () {
-                MessageToast.show("Failed to load active users");
-            });
+            this._loadActiveUsersKpi(iRoute);
         },
 
         // ── DATA LOADING ──────────────────────────────────────────────
 
-        _loadInitiative: function (sId) {
-            var oDetailModel = this._detail();
-            this.getView().getModel().bindContext("/Initiatives(" + sId + ")")
-                .requestObject()
-                .then(function (oData) {
-                    oDetailModel.setProperty("/name", oData.name || "");
-                    oDetailModel.setProperty("/status", oData.status || "");
-                    oDetailModel.setProperty("/statusCriticality", oData.statusCriticality || 0);
-                    oDetailModel.setProperty("/owner", oData.owner || "");
-                    oDetailModel.setProperty("/launchDate", oData.launchDate || "");
-                    oDetailModel.setProperty("/iasGroup", oData.iasGroup || "");
-                })
-                .catch(function () {
-                    MessageToast.show("Failed to load initiative details");
-                });
+        _odata() {
+            return this.getView().getModel();
         },
 
-        _loadEnabledUserCount: function (sId) {
-            var oDetailModel = this._detail();
-            var oFunctionContext = this.getView().getModel().bindContext("/getEnabledUserCount(...)");
-            oFunctionContext.setParameter("initiativeId", sId);
-            oFunctionContext.invoke()
-                .then(function () {
-                    var oResult = oFunctionContext.getBoundContext().getObject();
-                    oDetailModel.setProperty("/enabledUsersCount", oResult.count || 0);
-                })
-                .catch(function () {
-                    MessageToast.show("Failed to load enabled user count");
-                });
+        _detail() {
+            return this.getView().getModel(MODELS.DETAIL);
         },
 
-        // Resolves with the trend array (never rejects)
-        _loadTrendCounts: function (sGrain) {
-            var oTrendModel = this.getView().getModel("trendModel");
-            var oFunctionContext = this.getView().getModel().bindContext("/getTrendCounts(...)");
-            oFunctionContext.setParameter("initiativeId", this._sInitiativeId);
-            oFunctionContext.setParameter("grain", sGrain);
-            return oFunctionContext.invoke()
-                .then(function () {
-                    var aResults = (oFunctionContext.getBoundContext().getObject().value || [])
-                        .map(function (o) {
-                            return { periodLabel: o.periodLabel, activeCount: o.activeCount };
-                        });
-                    oTrendModel.setProperty("/results", aResults);
-                    return aResults;
-                })
-                .catch(function () {
-                    MessageToast.show("Failed to load trend data");
-                    oTrendModel.setProperty("/results", []);
-                    return [];
-                });
-        },
-
-        // Generic list read -> mapped plain rows
-        _requestRows: function (sPath, aFilters, mParameters, fnMap) {
-            var oBinding = this.getView().getModel().bindList(sPath, null, [], aFilters, mParameters);
-            return oBinding.requestContexts(0, 500).then(function (aContexts) {
-                var aRows = aContexts.map(function (oContext) { return fnMap(oContext.getObject()); });
+        async _loadInitiative(sId, iRoute) {
+            const oBinding = this._odata().bindContext(`${ODATA.INITIATIVES}(${sId})`);
+            try {
+                const oData = await oBinding.requestObject();
+                if (iRoute !== this._iRouteReq) {
+                    return;
+                }
+                const oDetail = this._detail();
+                oDetail.setProperty("/name", oData.name || "");
+                oDetail.setProperty("/status", oData.status || "");
+                oDetail.setProperty("/owner", oData.owner || "");
+                oDetail.setProperty("/launchDate", oData.launchDate || null);
+                oDetail.setProperty("/iasGroup", oData.iasGroup || "");
+            } catch (oError) {
+                this._reportError("msg_load_initiative_failed", oError);
+            } finally {
                 oBinding.destroy();
-                return aRows;
-            });
+            }
         },
 
-        _personName: function (o) {
+        async _loadEnabledUserCount(sId, iRoute) {
+            try {
+                const oResult = await service.callFunction(this._odata(), ODATA.FN_ENABLED_COUNT, { initiativeId: sId });
+                if (iRoute === this._iRouteReq) {
+                    this._detail().setProperty("/enabledUsersCount", oResult.count || 0);
+                }
+            } catch (oError) {
+                this._reportError("msg_load_enabled_count_failed", oError);
+            }
+        },
+
+        // The "Active users" card shows the latest month. The month comes from the trend,
+        // and the number is counted by the server (not by counting loaded rows).
+        async _loadActiveUsersKpi(iRoute) {
+            try {
+                const aTrend = await this._loadTrendCounts(GRAIN.MONTHLY, iRoute);
+                if (iRoute !== this._iRouteReq || !aTrend.length) {
+                    return;
+                }
+                this._sLatestMonthly = aTrend[aTrend.length - 1].periodLabel;
+                const iCount = await service.countRows(this._odata(), 
+                    ODATA.ACTIVE_USERS, this._activeFilters(GRAIN.MONTHLY, this._sLatestMonthly));
+                if (iRoute === this._iRouteReq) {
+                    this._detail().setProperty("/activeUsersCount", iCount);
+                }
+            } catch (oError) {
+                this._reportError("msg_load_active_failed", oError);
+            }
+        },
+
+        // Always resolves with the trend array. Only the newest request may update the chart.
+        async _loadTrendCounts(sGrain, iRoute) {
+            let aResults = [];
+            try {
+                const oResult = await service.callFunction(this._odata(), 
+                    ODATA.FN_TREND, { initiativeId: this._sInitiativeId, grain: sGrain });
+                aResults = (oResult.value || []).map((o) => ({
+                    periodLabel: o.periodLabel,
+                    activeCount: o.activeCount
+                }));
+            } catch (oError) {
+                this._reportError("msg_load_trend_failed", oError);
+            }
+            if (iRoute === this._iRouteReq && sGrain === this._sGrain) {
+                this.getView().getModel(MODELS.TREND).setProperty("/results", aResults);
+            }
+            return aResults;
+        },
+
+        _activeFilters(sGrain, sPeriod) {
+            return [
+                new Filter("grain", FilterOperator.EQ, sGrain),
+                new Filter("periodLabel", FilterOperator.EQ, sPeriod),
+                new Filter("person_initiative_ID", FilterOperator.EQ, this._sInitiativeId)
+            ];
+        },
+
+        // Names and emails arrive already masked by the server unless the user has the detail role
+        _personName(o) {
             return o.displayName || [o.firstName, o.lastName].filter(Boolean).join(" ") || o.email || "";
         },
 
-        _fetchEnabledPersons: function () {
-            var that = this;
-            return this._requestRows(
-                "/Persons",
+        _fetchEnabledPersons() {
+            return service.requestRows(this._odata(), 
+                ODATA.PERSONS,
                 [new Filter("initiative_ID", FilterOperator.EQ, this._sInitiativeId)],
                 undefined,
-                function (o) {
-                    return { scimId: o.scimId, name: that._personName(o), email: o.email, active: !!o.active };
-                }
+                (o) => ({ scimId: o.scimId, name: this._personName(o), email: o.email, active: !!o.active })
             );
         },
 
-        _fetchActiveRoster: function (sGrain, sPeriod) {
-            var that = this;
-            return this._requestRows(
-                "/ActiveUsers",
-                [
-                    new Filter("grain", FilterOperator.EQ, sGrain),
-                    new Filter("periodLabel", FilterOperator.EQ, sPeriod),
-                    new Filter("person_initiative_ID", FilterOperator.EQ, this._sInitiativeId)
-                ],
+        _fetchActiveRoster(sGrain, sPeriod) {
+            return service.requestRows(this._odata(), 
+                ODATA.ACTIVE_USERS,
+                this._activeFilters(sGrain, sPeriod),
                 { $expand: "person" },
-                function (o) {
-                    var p = o.person || {};
+                (o) => {
+                    const p = o.person || {};
                     return {
                         scimId: p.scimId,
-                        name: that._personName(p),
+                        name: this._personName(p),
                         email: p.email,
                         firstSeen: o.firstSeen,
                         lastSeen: o.lastSeen
@@ -187,75 +221,87 @@ sap.ui.define([
 
         // ── LIST SWITCHING ────────────────────────────────────────────
 
-        _showEnabledList: function () {
-            var that = this;
-            var iReq = ++this._iListReq;
-            this._setMode(ENABLED, "");
+        async _showEnabledList() {
+            const iReq = ++this._iListReq;
+            this._setMode(LIST_MODE.ENABLED, "");
             this._setBusy(true);
-            return this._fetchEnabledPersons()
-                .then(function (aRows) {
-                    if (iReq === that._iListReq) { that._applyRows(aRows); }
-                })
-                .catch(function () {
-                    if (iReq === that._iListReq) {
-                        that._applyRows([]);
-                        MessageToast.show("Failed to load enabled users");
-                    }
-                });
+            try {
+                const aRows = await this._fetchEnabledPersons();
+                if (iReq === this._iListReq) {
+                    this._applyRows(aRows);
+                }
+            } catch (oError) {
+                if (iReq === this._iListReq) {
+                    this._applyRows([]);
+                    this._reportError("msg_load_enabled_failed", oError);
+                }
+            }
         },
 
-        _showActiveList: function (sGrain, sPeriod) {
-            var that = this;
-            var iReq = ++this._iListReq;
-            this._setMode(ACTIVE, sPeriod || "");
+        async _showActiveList(sGrain, sPeriod) {
+            const iReq = ++this._iListReq;
+            this._setMode(LIST_MODE.ACTIVE, sPeriod || "");
             if (!sPeriod) {
                 this._applyRows([]);
-                return Promise.resolve();
+                return;
             }
             this._setBusy(true);
-            return this._fetchActiveRoster(sGrain, sPeriod)
-                .then(function (aRows) {
-                    if (iReq === that._iListReq) { that._applyRows(aRows); }
-                })
-                .catch(function () {
-                    if (iReq === that._iListReq) {
-                        that._applyRows([]);
-                        MessageToast.show("Failed to load active users");
-                    }
-                });
+            try {
+                const aRows = await this._fetchActiveRoster(sGrain, sPeriod);
+                if (iReq === this._iListReq) {
+                    this._applyRows(aRows);
+                }
+            } catch (oError) {
+                if (iReq === this._iListReq) {
+                    this._applyRows([]);
+                    this._reportError("msg_load_active_failed", oError);
+                }
+            }
         },
 
-        _applyRows: function (aRows) {
-            this.getView().getModel("userListModel").setData(aRows);
+        _applyRows(aRows) {
+            this.getView().getModel(MODELS.USER_LIST).setData(aRows);
             this._detail().setProperty("/listCount", aRows.length);
             this._setBusy(false);
+            if (aRows.length >= MAX_LIST_ROWS) {
+                messages.show(this.getView(), "msg_list_truncated", [MAX_LIST_ROWS]);
+            }
         },
 
-        _setMode: function (sMode, sPeriod) {
+        _setMode(sMode, sPeriod) {
             this._detail().setProperty("/listMode", sMode);
             this._detail().setProperty("/listPeriod", sPeriod);
-            this._markCard(sMode);
+            this._markCards(sMode);
         },
 
-        _setBusy: function (bBusy) {
+        _setBusy(bBusy) {
             this._detail().setProperty("/listBusy", bBusy);
         },
 
-        _markCard: function (sMode) {
-            var oEnabled = this.byId("enabledUsersKpi");
-            var oActive = this.byId("activeUsersKpi");
-            if (oEnabled) { oEnabled.toggleStyleClass(SELECTED_CLASS, sMode === ENABLED); }
-            if (oActive) { oActive.toggleStyleClass(SELECTED_CLASS, sMode === ACTIVE); }
+        _markCards(sMode) {
+            const mCards = { enabledUsersKpi: LIST_MODE.ENABLED, activeUsersKpi: LIST_MODE.ACTIVE };
+            Object.entries(mCards).forEach(([sId, sCardMode]) => {
+                const oCard = this.byId(sId);
+                if (!oCard) {
+                    return;   // not created yet; marked again when the cards are wired
+                }
+                const bSelected = sMode === sCardMode;
+                oCard.toggleStyleClass(SELECTED_CARD_CLASS, bSelected);
+                const oDom = oCard.getDomRef();
+                if (oDom) {
+                    oDom.setAttribute("aria-pressed", String(bSelected));
+                }
+            });
         },
 
-        _latestPeriod: function () {
-            var aResults = this.getView().getModel("trendModel").getProperty("/results") || [];
+        _latestPeriod() {
+            const aResults = this.getView().getModel(MODELS.TREND).getProperty("/results") || [];
             return aResults.length ? aResults[aResults.length - 1].periodLabel : "";
         },
 
-        _scrollToList: function () {
-            var oSection = this.byId("userListSection");
-            var oDom = oSection && oSection.getDomRef();
+        _scrollToList() {
+            const oSection = this.byId("userListSection");
+            const oDom = oSection && oSection.getDomRef();
             if (oDom && oDom.scrollIntoView) {
                 oDom.scrollIntoView({ behavior: "smooth", block: "start" });
             }
@@ -263,31 +309,38 @@ sap.ui.define([
 
         // ── KPI CARD CLICK WIRING ─────────────────────────────────────
 
-        _wireCards: function () {
-            if (this._bCardsWired) { return; }
-            var oEnabled = this.byId("enabledUsersKpi");
-            var oActive = this.byId("activeUsersKpi");
-            if (!oEnabled || !oActive) { return; }   // not created yet; retried on next render / route match
-
-            this._makeClickable(oEnabled, this.onEnabledCardPress);
-            this._makeClickable(oActive, this.onActiveCardPress);
+        _wireCards() {
+            if (this._bCardsWired) {
+                return;
+            }
+            const oEnabled = this.byId("enabledUsersKpi");
+            const oActive = this.byId("activeUsersKpi");
+            if (!oEnabled || !oActive) {
+                return;   // not created yet; tried again after the next rendering
+            }
+            this._makeClickable(oEnabled, this.onEnabledCardPress, LIST_MODE.ENABLED);
+            this._makeClickable(oActive, this.onActiveCardPress, LIST_MODE.ACTIVE);
             this._bCardsWired = true;
-            this._markCard(this._detail().getProperty("/listMode"));
+            this._markCards(this._detail().getProperty("/listMode"));
         },
 
-        _makeClickable: function (oCard, fnHandler) {
-            var that = this;
-            var applyA11y = function () {
-                var oDom = oCard.getDomRef();
+        // A card is a plain box, so mouse, Enter and Space are added here and it gets button semantics
+        _makeClickable(oCard, fnHandler, sCardMode) {
+            const applyA11y = () => {
+                const oDom = oCard.getDomRef();
                 if (oDom) {
                     oDom.setAttribute("tabindex", "0");
                     oDom.setAttribute("role", "button");
+                    oDom.setAttribute("aria-pressed", String(this._detail().getProperty("/listMode") === sCardMode));
                 }
             };
             oCard.addEventDelegate({
-                ontap: function () { fnHandler.call(that); },
-                onsapenter: function () { fnHandler.call(that); },
-                onsapspace: function (oEvt) { oEvt.preventDefault(); fnHandler.call(that); },
+                ontap: () => fnHandler.call(this),
+                onsapenter: () => fnHandler.call(this),
+                onsapspace: (oEvent) => {
+                    oEvent.preventDefault();
+                    fnHandler.call(this);
+                },
                 onAfterRendering: applyA11y
             });
             applyA11y();
@@ -295,69 +348,61 @@ sap.ui.define([
 
         // ── EVENT HANDLERS ────────────────────────────────────────────
 
-        onEnabledCardPress: function () {
+        onEnabledCardPress() {
             this._showEnabledList();
             this._scrollToList();
         },
 
-        onActiveCardPress: function () {
-            this._showActiveList("MONTHLY", this._sLatestMonthly);
+        onActiveCardPress() {
+            this._showActiveList(GRAIN.MONTHLY, this._sLatestMonthly);
             this._scrollToList();
         },
 
-        onGrainToggle: function (oEvent) {
-            var that = this;
+        async onGrainToggle(oEvent) {
+            const iRoute = this._iRouteReq;
             this._sGrain = oEvent.getParameter("item").getKey();
-            this._loadTrendCounts(this._sGrain).then(function () {
-                // Only follow the toggle if the list is currently showing a chart/active period
-                if (that._detail().getProperty("/listMode") === ACTIVE) {
-                    that._showActiveList(that._sGrain, that._latestPeriod());
-                }
-            });
+            await this._loadTrendCounts(this._sGrain, iRoute);
+            // The list follows the toggle only while it is showing an active period
+            if (iRoute === this._iRouteReq && this._detail().getProperty("/listMode") === LIST_MODE.ACTIVE) {
+                this._showActiveList(this._sGrain, this._latestPeriod());
+            }
         },
 
-        onTrendSelect: function (oEvent) {
-            clearTimeout(this._iDeselectTimer);
-            var aSelected = oEvent.getParameter("data") || [];
-            var oPoint = aSelected.length ? aSelected[aSelected.length - 1].data : null;
-            var sPeriod = oPoint && oPoint.Period;
-            if (!sPeriod) { return; }
+        onTrendSelect(oEvent) {
+            const aSelected = oEvent.getParameter("data") || [];
+            const oPoint = aSelected.length ? aSelected[aSelected.length - 1].data : null;
+            const sPeriod = oPoint && oPoint[CHART_PERIOD_DIMENSION];
+            if (!sPeriod) {
+                return;
+            }
             this._showActiveList(this._sGrain, sPeriod);
             this._scrollToList();
         },
 
-        onTrendDeselect: function () {
-            var that = this;
-            clearTimeout(this._iDeselectTimer);
-            this._iDeselectTimer = setTimeout(function () {
-                var oChart = that.byId("trendChart");
-                var aSel = oChart && oChart.vizSelection ? oChart.vizSelection() : [];
-                if (aSel && aSel.length) {
-                    return;   // a point is still selected, so this was just the old one being replaced
-                }
-            }, 150);
-
-        },
-
-        onNavBack: function () {
-            var sPreviousHash = History.getInstance().getPreviousHash();
-            if (sPreviousHash !== undefined) {
+        onNavBack() {
+            if (History.getInstance().getPreviousHash() !== undefined) {
                 window.history.go(-1);
             } else {
-                this.oRouter.navTo("InitiativesMain");
+                this.getAppComponent().getRouter().navTo(ROUTES.MAIN);
             }
         },
 
-        onUserPress: function (oEvent) {
-            var oRow = oEvent.getSource().getBindingContext("userListModel").getObject();
-            if (!oRow || !oRow.scimId) { return; }
-            this.oRouter.navTo("UserDetail", {
+        onUserPress(oEvent) {
+            const oRow = oEvent.getSource().getBindingContext(MODELS.USER_LIST).getObject();
+            if (!oRow || !oRow.scimId) {
+                return;
+            }
+            this.getAppComponent().getRouter().navTo(ROUTES.USER_DETAIL, {
                 initiativeId: this._sInitiativeId,
                 scimId: oRow.scimId
             });
         },
-        _detail: function () {
-            return this.getView().getModel("detailModel");
+
+        // ── MESSAGES ──────────────────────────────────────────────────
+
+        // Short message for the user, and the technical reason in the console
+        _reportError(sKey, oError) {
+            messages.report(this.getView(), sKey, oError);
         }
     });
 });

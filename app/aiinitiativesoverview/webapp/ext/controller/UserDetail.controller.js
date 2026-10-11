@@ -3,307 +3,265 @@ sap.ui.define([
     "sap/ui/model/json/JSONModel",
     "sap/ui/model/Filter",
     "sap/ui/model/FilterOperator",
-    "sap/m/MessageToast",
-    "sap/ui/core/routing/History"
-], function (PageController, JSONModel, Filter, FilterOperator, MessageToast, History) {
+    "sap/ui/core/format/DateFormat",
+    "sap/ui/core/routing/History",
+    "sap/base/Log",
+    "../util/constants",
+    "../util/service",
+    "../util/messages",
+    "../util/activity"
+], function (PageController, JSONModel, Filter, FilterOperator, DateFormat, History, Log,
+    constants, service, messages, activity) {
     "use strict";
 
-    var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const { ROUTES, MODELS, GRAIN, ODATA, MAX_LIST_ROWS, SAFE_ID_PATTERN, LOG_COMPONENT } = constants;
+
+    // The values the page starts with, and goes back to for every new user
+    function defaultUser() {
+        return {
+            name: "",
+            email: "",
+            active: false,
+            initiativeName: "",
+            firstSeen: null,
+            lastSeen: null,
+            unit: "",                // "weeks" or "months", in the user's language
+            currentStreak: 0,
+            longestText: "",
+            consistencyPct: 0,
+            consistencyNote: "",
+            busy: false,
+            notFound: false
+        };
+    }
 
     return PageController.extend("com.sap.aiinitiativesoverview.ext.controller.UserDetail", {
 
-        onInit: function () {
+        onInit() {
             PageController.prototype.onInit.apply(this, arguments);
 
             this._sInitiativeId = null;
             this._sScimId = null;
-            this._sGrain = "WEEKLY";
-            this._iReq = 0;                       // guards against out-of-order responses
+            this._sGrain = GRAIN.WEEKLY;
+            this._iReq = 0;                       // changes on every route match: late answers are dropped
             this._aRoster = [];                   // all ActiveUsers rows of this person
-            this._mUniverse = { WEEKLY: [], MONTHLY: [] };   // known period labels per grain
+            this._mUniverse = { [GRAIN.WEEKLY]: [], [GRAIN.MONTHLY]: [] };   // known period labels per grain
 
-            this.oRouter = this.getAppComponent().getRouter();
-            this.oRouter
-                .getRoute("UserDetail")
-                .attachPatternMatched(this._onRouteMatched, this);
+            this._oRoute = this.getAppComponent().getRouter().getRoute(ROUTES.USER_DETAIL);
+            this._oRoute.attachPatternMatched(this._onRouteMatched, this);
 
-            this.getView().setModel(new JSONModel({
-                name: "",
-                email: "",
-                active: false,
-                initiativeName: "",
-                firstSeen: "",
-                lastSeen: "",
-                grain: "WEEKLY",
-                currentStreak: 0,
-                longestStreak: 0,
-                consistencyPct: 0,
-                activePeriods: 0,
-                periodsSinceFirst: 0,
-                busy: false,
-                notFound: false
-            }), "userModel");
-
-            this.getView().setModel(new JSONModel({ groups: [], rows: [] }), "activityModel");
+            this.getView().setModel(new JSONModel(defaultUser()), MODELS.USER);
+            this.getView().setModel(new JSONModel({ groups: [], rows: [] }), MODELS.ACTIVITY);
         },
 
-        _onRouteMatched: function (oEvent) {
-            var that = this;
-            var mArgs = oEvent.getParameter("arguments");
-            this._sInitiativeId = mArgs.initiativeId;
-            this._sScimId = mArgs.scimId;       // the router already decodes route parameters
-            this._sGrain = "WEEKLY";
-            var iReq = ++this._iReq;
+        onExit() {
+            this._oRoute.detachPatternMatched(this._onRouteMatched, this);
+            if (PageController.prototype.onExit) {
+                PageController.prototype.onExit.apply(this, arguments);
+            }
+        },
 
-            var oToggle = this.byId("userGrainToggle");
-            if (oToggle) { oToggle.setSelectedKey("WEEKLY"); }
+        async _onRouteMatched(oEvent) {
+            const { initiativeId, scimId } = oEvent.getParameter("arguments");
 
+            if (!SAFE_ID_PATTERN.test(initiativeId || "") || !scimId) {
+                Log.error("Invalid initiative or user id in the URL", "", LOG_COMPONENT);
+                messages.show(this.getView(), "msg_invalid_user");
+                this.getAppComponent().getRouter().navTo(ROUTES.MAIN, {}, true);
+                return;
+            }
+
+            const iReq = ++this._iReq;
+            this._sInitiativeId = initiativeId;
+            this._sScimId = scimId;
+            this._sGrain = GRAIN.WEEKLY;
             this._aRoster = [];
-            this._mUniverse = { WEEKLY: [], MONTHLY: [] };
-            this._user().setData({
-                name: "", email: "", active: false, initiativeName: "",
-                firstSeen: "", lastSeen: "", grain: "WEEKLY",
-                currentStreak: 0, longestStreak: 0, consistencyPct: 0,
-                activePeriods: 0, periodsSinceFirst: 0,
-                busy: true, notFound: false
-            });
-            this.getView().getModel("activityModel").setData({ groups: [], rows: [] });
+            this._mUniverse = { [GRAIN.WEEKLY]: [], [GRAIN.MONTHLY]: [] };
 
-            Promise.all([
-                this._fetchProfile(),
-                this._fetchRoster(),
-                this._fetchUniverse("WEEKLY"),
-                this._fetchUniverse("MONTHLY")
-            ]).then(function (aRes) {
-                if (iReq !== that._iReq) { return; }      // a newer navigation took over
-                var oProfile = aRes[0];
+            // Start clean, so nothing from the previous user is shown while this one loads
+            this._user().setData({ ...defaultUser(), busy: true });
+            this.getView().getModel(MODELS.ACTIVITY).setData({ groups: [], rows: [] });
+            const oToggle = this.byId("userGrainToggle");
+            if (oToggle) {
+                oToggle.setSelectedKey(GRAIN.WEEKLY);
+            }
+
+            try {
+                const [oProfile, aRoster, aWeeks, aMonths] = await Promise.all([
+                    this._fetchProfile(),
+                    this._fetchRoster(),
+                    this._fetchUniverse(GRAIN.WEEKLY),
+                    this._fetchUniverse(GRAIN.MONTHLY)
+                ]);
+                if (iReq !== this._iReq) {
+                    return;      // a newer navigation took over
+                }
                 if (!oProfile) {
-                    that._user().setProperty("/notFound", true);
-                    that._user().setProperty("/name", that._sScimId);
-                    that._user().setProperty("/busy", false);
+                    this._user().setProperty("/notFound", true);
+                    this._user().setProperty("/name", this._sScimId);
                     return;
                 }
-                that._user().setProperty("/name", oProfile.name);
-                that._user().setProperty("/email", oProfile.email);
-                that._user().setProperty("/active", oProfile.active);
-                that._user().setProperty("/initiativeName", oProfile.initiativeName);
-                that._aRoster = aRes[1];
-                that._mUniverse = { WEEKLY: aRes[2], MONTHLY: aRes[3] };
-                that._computeStats();
-                that._renderGrain();
-                that._user().setProperty("/busy", false);
-            }).catch(function () {
-                if (iReq !== that._iReq) { return; }
-                that._user().setProperty("/busy", false);
-                MessageToast.show("Failed to load user details");
-            });
+                const oUser = this._user();
+                oUser.setProperty("/name", oProfile.name);
+                oUser.setProperty("/email", oProfile.email);
+                oUser.setProperty("/active", oProfile.active);
+                oUser.setProperty("/initiativeName", oProfile.initiativeName);
+
+                this._aRoster = aRoster;
+                this._mUniverse = { [GRAIN.WEEKLY]: aWeeks, [GRAIN.MONTHLY]: aMonths };
+                if (aRoster.length >= MAX_LIST_ROWS) {
+                    messages.show(this.getView(), "msg_periods_truncated", [MAX_LIST_ROWS]);
+                }
+                this._computeFirstLast();
+                this._renderGrain();
+            } catch (oError) {
+                if (iReq === this._iReq) {
+                    messages.report(this.getView(), "msg_load_user_failed", oError);
+                }
+            } finally {
+                if (iReq === this._iReq) {
+                    this._user().setProperty("/busy", false);
+                }
+            }
         },
 
         // ── DATA LOADING ──────────────────────────────────────────────
 
-        _requestRows: function (sPath, aFilters, mParameters, fnMap) {
-            var oBinding = this.getView().getModel().bindList(sPath, null, [], aFilters, mParameters);
-            return oBinding.requestContexts(0, 500).then(function (aContexts) {
-                var aRows = aContexts.map(function (oContext) { return fnMap(oContext.getObject()); });
-                oBinding.destroy();
-                return aRows;
-            });
+        _odata() {
+            return this.getView().getModel();
         },
 
-        // Resolves with the profile, or null when the person is not returned by the service
-        _fetchProfile: function () {
-            return this._requestRows(
-                "/Persons",
+        _user() {
+            return this.getView().getModel(MODELS.USER);
+        },
+
+        // Resolves with the profile, or null when the person is not returned by the service.
+        // Names and emails arrive already masked by the server unless the user has the detail role.
+        async _fetchProfile() {
+            const aRows = await service.requestRows(
+                this._odata(),
+                ODATA.PERSONS,
                 [
                     new Filter("scimId", FilterOperator.EQ, this._sScimId),
                     new Filter("initiative_ID", FilterOperator.EQ, this._sInitiativeId)
                 ],
                 undefined,
-                function (o) {
-                    return {
-                        name: o.displayName || [o.firstName, o.lastName].filter(Boolean).join(" ") || o.email || o.scimId,
-                        email: o.email,
-                        active: !!o.active,
-                        initiativeName: o.initiativeName
-                    };
-                }
-            ).then(function (aRows) { return aRows.length ? aRows[0] : null; });
+                (o) => ({
+                    name: o.displayName || [o.firstName, o.lastName].filter(Boolean).join(" ") || o.email || o.scimId,
+                    email: o.email,
+                    active: !!o.active,
+                    initiativeName: o.initiativeName
+                })
+            );
+            return aRows.length ? aRows[0] : null;
         },
 
-        // All period rows of this person (WEEKLY, MONTHLY and YEARLY)
-        _fetchRoster: function () {
-            return this._requestRows(
-                "/ActiveUsers",
+        // All period rows of this person (every grain)
+        _fetchRoster() {
+            return service.requestRows(
+                this._odata(),
+                ODATA.ACTIVE_USERS,
                 [
                     new Filter("person_scimId", FilterOperator.EQ, this._sScimId),
                     new Filter("person_initiative_ID", FilterOperator.EQ, this._sInitiativeId)
                 ],
                 undefined,
-                function (o) {
-                    return {
-                        grain: o.grain,
-                        periodLabel: o.periodLabel,
-                        firstSeen: o.firstSeen,
-                        lastSeen: o.lastSeen
-                    };
-                }
+                (o) => ({ grain: o.grain, periodLabel: o.periodLabel, firstSeen: o.firstSeen, lastSeen: o.lastSeen })
             );
         },
 
-        // Period labels that exist in the data (from getTrendCounts, not scoped to one
-        // initiative). Used only so that periods without activity show up as gaps.
-        _fetchUniverse: function (sGrain) {
-            var oFunctionContext = this.getView().getModel().bindContext("/getTrendCounts(...)");
-            oFunctionContext.setParameter("initiativeId", this._sInitiativeId);
-            oFunctionContext.setParameter("grain", sGrain);
-            return oFunctionContext.invoke()
-                .then(function () {
-                    var aValues = oFunctionContext.getBoundContext().getObject().value || [];
-                    return aValues.map(function (o) { return o.periodLabel; });
-                })
-                .catch(function () { return []; });
+        // The period labels that exist for this initiative (from getTrendCounts), so that periods
+        // where this person was away show up as gaps. A period in which nobody at all was active
+        // is not in this list. If the call fails the page still works, just without the gaps.
+        async _fetchUniverse(sGrain) {
+            try {
+                const oResult = await service.callFunction(
+                    this._odata(), ODATA.FN_TREND, { initiativeId: this._sInitiativeId, grain: sGrain });
+                return (oResult.value || []).map((o) => o.periodLabel);
+            } catch (oError) {
+                Log.warning(`Could not read the ${sGrain} period list, gaps are not shown`, oError && oError.message, LOG_COMPONENT);
+                return [];
+            }
         },
 
         // ── DERIVED VALUES ────────────────────────────────────────────
 
-        // First seen / last seen across every grain
-        _computeStats: function () {
-            var sFirst = "";
-            var sLast = "";
-            this._aRoster.forEach(function (r) {
-                if (r.firstSeen && (!sFirst || r.firstSeen < sFirst)) { sFirst = r.firstSeen; }
-                if (r.lastSeen && (!sLast || r.lastSeen > sLast)) { sLast = r.lastSeen; }
+        // First and last time the person was seen, across every grain
+        _computeFirstLast() {
+            let sFirst = null;
+            let sLast = null;
+            this._aRoster.forEach((r) => {
+                if (r.firstSeen && (!sFirst || r.firstSeen < sFirst)) {
+                    sFirst = r.firstSeen;
+                }
+                if (r.lastSeen && (!sLast || r.lastSeen > sLast)) {
+                    sLast = r.lastSeen;
+                }
             });
             this._user().setProperty("/firstSeen", sFirst);
             this._user().setProperty("/lastSeen", sLast);
         },
 
-        // Monday of an ISO week label such as "2026-W39" (UTC)
-        _isoWeekStart: function (sLabel) {
-            var aParts = sLabel.split("-W");
-            var iYear = parseInt(aParts[0], 10);
-            var iWeek = parseInt(aParts[1], 10);
-            var oJan4 = new Date(Date.UTC(iYear, 0, 4));
-            var iDow = oJan4.getUTCDay() || 7;
-            return new Date(oJan4.getTime() + ((iWeek - 1) * 7 - (iDow - 1)) * 86400000);
+        // The 12 month names in the user's language
+        _monthNames() {
+            const oFormat = DateFormat.getDateInstance({ pattern: "MMM", UTC: true });
+            return Array.from({ length: 12 }, (_, i) => oFormat.format(new Date(Date.UTC(2000, i, 1))));
         },
 
-        // Which group row a period belongs to, plus the short text on its box
-        _describe: function (sLabel, sGrain) {
-            var aParts = sLabel.split("-");
-            if (sGrain === "WEEKLY") {
-                var oStart = this._isoWeekStart(sLabel);
-                var iMonth = oStart.getUTCMonth();
-                var iYear = oStart.getUTCFullYear();
-                return {
-                    groupKey: iYear * 12 + iMonth,
-                    groupTitle: MONTHS[iMonth] + " " + iYear,
-                    text: aParts[1] || sLabel                       // "2026-W39" -> "W39"
-                };
-            }
-            var iM = parseInt(aParts[1], 10);
-            return {
-                groupKey: parseInt(aParts[0], 10),
-                groupTitle: aParts[0],
-                text: iM ? MONTHS[iM - 1] : sLabel                  // "2026-09" -> "Sep"
-            };
-        },
+        _renderGrain() {
+            const oView = this.getView();
+            const sGrain = this._sGrain;
 
-        _renderGrain: function () {
-            var that = this;
-            var sGrain = this._sGrain;
-            var mMine = {};
-            this._aRoster.forEach(function (r) {
-                if (r.grain === sGrain) { mMine[r.periodLabel] = r; }
+            const mMine = {};
+            this._aRoster.filter((r) => r.grain === sGrain).forEach((r) => {
+                mMine[r.periodLabel] = r;
             });
 
-            // known periods plus any period of this person that is not in the list yet
-            var aLabels = (this._mUniverse[sGrain] || []).slice();
-            Object.keys(mMine).forEach(function (sLabel) {
-                if (aLabels.indexOf(sLabel) < 0) { aLabels.push(sLabel); }
-            });
-            aLabels.sort();
+            // known periods plus any period of this person that is not in the list
+            const aLabels = [...new Set([...(this._mUniverse[sGrain] || []), ...Object.keys(mMine)])].sort();
 
-            // periods before the person's first active period are "pre" (before first use)
-            var iFirst = -1;
-            aLabels.forEach(function (sLabel, i) {
-                if (iFirst < 0 && mMine[sLabel]) { iFirst = i; }
-            });
-
-            // streaks and consistency, counted from first use to the latest known period
-            var iActive = 0;
-            var iLongest = 0;
-            var iRun = 0;
-            if (iFirst >= 0) {
-                aLabels.slice(iFirst).forEach(function (sLabel) {
-                    if (mMine[sLabel]) {
-                        iActive++;
-                        iRun++;
-                        if (iRun > iLongest) { iLongest = iRun; }
-                    } else {
-                        iRun = 0;
-                    }
-                });
-            }
-            var iSince = iFirst >= 0 ? aLabels.length - iFirst : 0;
-
-            var oUser = this._user();
-            oUser.setProperty("/grain", sGrain);
-            oUser.setProperty("/currentStreak", iRun);               // run that ends at the latest period
-            oUser.setProperty("/longestStreak", iLongest);
-            oUser.setProperty("/activePeriods", iActive);
-            oUser.setProperty("/periodsSinceFirst", iSince);
-            oUser.setProperty("/consistencyPct", iSince ? Math.round(iActive / iSince * 100) : 0);
-
-            // cells grouped into month rows (weekly) or year rows (monthly)
-            var aGroups = [];
-            var mGroupIndex = {};
-            aLabels.forEach(function (sLabel, i) {
-                var oInfo = that._describe(sLabel, sGrain);
-                var r = mMine[sLabel];
-                var sStatus = r ? "on" : ((iFirst >= 0 && i < iFirst) ? "pre" : "off");
-                var sTip = sLabel + ": " + (r ? r.firstSeen + " – " + r.lastSeen
-                    : (sStatus === "pre" ? "before first use" : "no activity"));
-                if (mGroupIndex[oInfo.groupKey] === undefined) {
-                    mGroupIndex[oInfo.groupKey] = aGroups.length;
-                    aGroups.push({ title: oInfo.groupTitle, cells: [] });
+            const { stats, groups } = activity.buildActivity({
+                labels: aLabels,
+                mine: mMine,
+                grain: sGrain,
+                monthNames: this._monthNames(),
+                texts: {
+                    pre: messages.getText(oView, "activity_tip_pre"),
+                    none: messages.getText(oView, "activity_tip_none")
                 }
-                aGroups[mGroupIndex[oInfo.groupKey]].cells.push({
-                    label: oInfo.text,
-                    status: sStatus,
-                    tip: sTip
-                });
             });
 
-            var aRows = Object.keys(mMine).sort().reverse().map(function (sLabel) {
-                return {
-                    periodLabel: sLabel,
-                    firstSeen: mMine[sLabel].firstSeen,
-                    lastSeen: mMine[sLabel].lastSeen
-                };
-            });
+            const sUnit = messages.getText(oView, sGrain === GRAIN.WEEKLY ? "unit_weeks" : "unit_months");
+            const oUser = this._user();
+            oUser.setProperty("/unit", sUnit);
+            oUser.setProperty("/currentStreak", stats.currentStreak);
+            oUser.setProperty("/longestText", messages.getText(oView, "stat_longest_note", [stats.longestStreak, sUnit]));
+            oUser.setProperty("/consistencyPct", stats.consistencyPct);
+            oUser.setProperty("/consistencyNote", messages.getText(
+                oView, "stat_consistency_note", [stats.activePeriods, stats.periodsSinceFirst, sUnit]));
 
-            this.getView().getModel("activityModel").setData({ groups: aGroups, rows: aRows });
+            const aRows = Object.keys(mMine).sort().reverse().map((sLabel) => ({
+                periodLabel: sLabel,
+                firstSeen: mMine[sLabel].firstSeen,
+                lastSeen: mMine[sLabel].lastSeen
+            }));
+            oView.getModel(MODELS.ACTIVITY).setData({ groups, rows: aRows });
         },
 
         // ── EVENT HANDLERS ────────────────────────────────────────────
 
-        onGrainToggle: function (oEvent) {
+        onGrainToggle(oEvent) {
             this._sGrain = oEvent.getParameter("item").getKey();
             this._renderGrain();
         },
 
-        onNavBack: function () {
-            var sPreviousHash = History.getInstance().getPreviousHash();
-            if (sPreviousHash !== undefined) {
+        onNavBack() {
+            if (History.getInstance().getPreviousHash() !== undefined) {
                 window.history.go(-1);
             } else {
-                this.oRouter.navTo("InitiativeDetail", { initiativeId: this._sInitiativeId });
+                this.getAppComponent().getRouter().navTo(
+                    ROUTES.INITIATIVE_DETAIL, { initiativeId: this._sInitiativeId });
             }
-        },
-
-        _user: function () {
-            return this.getView().getModel("userModel");
         }
     });
 });

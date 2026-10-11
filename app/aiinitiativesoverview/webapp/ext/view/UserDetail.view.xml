@@ -92,11 +92,11 @@
                             <Text
                                 id="statStreakValue"
                                 class="aiedStatValue"
-                                text="{= ${userModel>/currentStreak} + ' ' + (${userModel>/grain} === 'WEEKLY' ? ${i18n>unit_weeks} : ${i18n>unit_months}) }" />
+                                text="{= ${userModel>/currentStreak} + ' ' + ${userModel>/unit} }" />
                             <Text
                                 id="statStreakNote"
                                 class="aiedStatNote"
-                                text="{= ${i18n>stat_longest} + ' ' + ${userModel>/longestStreak} + ' ' + (${userModel>/grain} === 'WEEKLY' ? ${i18n>unit_weeks} : ${i18n>unit_months}) }" />
+                                text="{userModel>/longestText}" />
                         </VBox>
 
                         <VBox id="statConsistency" class="aiedStatCard aiedAnimIn aiedDelay2">
@@ -115,7 +115,7 @@
                             <Text
                                 id="statConsistencyNote"
                                 class="aiedStatNote"
-                                text="{= ${userModel>/activePeriods} + ' ' + ${i18n>stat_of} + ' ' + ${userModel>/periodsSinceFirst} + ' ' + (${userModel>/grain} === 'WEEKLY' ? ${i18n>unit_weeks} : ${i18n>unit_months}) + ' ' + ${i18n>stat_sinceFirst} }" />
+                                text="{userModel>/consistencyNote}" />
                         </VBox>
                     </HBox>
 
@@ -135,6 +135,7 @@
                                     class="aiedSectionTitle" />
                                 <Text id="activitySub" text="{i18n>activity_sub}" class="aiedSectionSub" />
                             </VBox>
+                            <!-- The keys are grains the service accepts (see constants.js) -->
                             <SegmentedButton
                                 id="userGrainToggle"
                                 width="14rem"
@@ -153,6 +154,7 @@
                             <ObjectStatus id="legendPre" text="{i18n>legend_pre}" inverted="false" state="None" />
                         </HBox>
 
+                        <!-- Each box already carries its colour (state, inverted) from activity.js -->
                         <VBox id="activityGroups" renderType="Bare" items="{activityModel>/groups}">
                             <HBox id="activityGroupRow" renderType="Bare" class="aiedGroupRow">
                                 <Text id="activityGroupTitle" text="{activityModel>title}" class="aiedGroupTitle" />
@@ -166,8 +168,8 @@
                                         class="aiedCellPill"
                                         text="{activityModel>label}"
                                         tooltip="{activityModel>tip}"
-                                        inverted="{= ${activityModel>status} !== 'pre' }"
-                                        state="{= ${activityModel>status} === 'on' ? 'Success' : 'None' }" />
+                                        inverted="{activityModel>inverted}"
+                                        state="{activityModel>state}" />
                                 </HBox>
                             </HBox>
                         </VBox>

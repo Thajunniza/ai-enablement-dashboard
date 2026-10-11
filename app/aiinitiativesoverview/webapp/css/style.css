@@ -1,139 +1,138 @@
-/* AI Enablement Dashboard — design tokens pinned to the Screen 1 wireframe spec */
+/* AI Enablement Dashboard — styles
+   All colours are defined once, in the token block below. Change a value there and it changes everywhere.
+   Class names start with "aied" so they cannot clash with UI5 classes.
+   !important is used only where UI5 sets the same property on its own inner elements.
+   The colours are fixed values, so the app looks the same in every theme (it is designed for a light theme). */
 
-/* Header: role pill, top-right of the page header */
-.aiedRolePill {
-    background: #F1F2F4;
-    border-radius: 999px;
-    padding: 6px 14px;
-    font-size: 13px;
-    color: #3A3F46;
+/* ═══════════════════════════════════════════════════════════════ */
+/* DESIGN TOKENS                                                    */
+/* ═══════════════════════════════════════════════════════════════ */
+:root {
+    /* Text. Every text colour below has at least 4.5:1 contrast on the surfaces it is used on. */
+    --aied-text: #1A1A1A;              /* titles, values */
+    --aied-text-stat: #1D2D3E;         /* big numbers on the user page */
+    --aied-text-body: #3A3F46;
+    --aied-text-muted: #6B7280;        /* labels, notes, captions */
+    --aied-text-label: #556B82;        /* section titles in the filter panel */
+
+    /* Brand colours: blue = enabled users, green = active users */
+    --aied-blue: #0057D8;
+    --aied-blue-pale: #E8F2FE;
+    --aied-blue-tint: #F5F9FF;
+    --aied-green: #1A7F37;
+    --aied-green-pale: #E6F4EA;
+    --aied-green-tint: #F4FBF6;
+
+    /* Surfaces */
+    --aied-surface: #FFFFFF;
+    --aied-surface-subtle: #F1F2F4;
+    --aied-surface-table: #F8F9FA;
+    --aied-surface-empty: #FBFBFC;
+    --aied-surface-hover: #F5F6F7;
+
+    /* Lines */
+    --aied-border: #E2E5E9;
+    --aied-border-input: #D5D9DD;
+    --aied-border-soft: #F0F1F3;
+
+    /* Shadow of a card at rest */
+    --aied-shadow: 0 1px 3px rgba(26, 26, 26, 0.05);
 }
 
-.aiedgrid{
+/* ═══════════════════════════════════════════════════════════════ */
+/* INITIATIVE CARDS (main page)                                     */
+/* ═══════════════════════════════════════════════════════════════ */
+
+.aiedgrid {
     padding-left: 2rem;
 }
 
-/* Card shell — fills its GridContainer cell */
+/* Card shell: fills its GridContainer cell */
 .aiedCard {
-    border: 1px solid #E2E5E9 !important;
+    border: 1px solid var(--aied-border) !important;
     border-radius: 12px !important;
-    background: #FFFFFF !important;
+    background: var(--aied-surface) !important;
     padding: 24px;
     box-sizing: border-box;
     width: 100%;
     height: 100%;
 }
 
-/* Coming-soon / not-yet-onboarded card: dimmed + italic title, per wireframe */
-.aiedComingSoonCard {
-    opacity: 0.55;
-}
-.aiedComingSoonCard .aiedCardTitle {
-    font-style: italic;
-}
-
-/* Card title (ObjectIdentifier / Title control, name field) */
+/* Initiative name */
 .aiedCardTitle {
     font-size: 18px;
     font-weight: 700;
-    color: #1A1A1A;
+    color: var(--aied-text);
 }
 
-/* Owner line + "Not yet onboarded" note */
+/* Owner line */
 .aiedCardOwner {
     font-size: 13px;
-    color: #6B7280;
+    color: var(--aied-text-muted);
 }
 
-/* Status badge — pill shape, colored per state.
-   ObjectStatus renders its text in a nested <span class="sapMObjStatusText">,
-   so both the outer control and the inner text span are targeted to make sure
-   the background/color/padding land regardless of DOM nesting. */
-.aiedStatusLive,
-.aiedStatusLive .sapMObjStatusText {
-    background: #E6F4EA !important;
-    color: #1A7F37 !important;
-    border-radius: 999px;
-    padding: 2px 10px;
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.aiedStatusComingSoon,
-.aiedStatusComingSoon .sapMObjStatusText {
-    background: #F1F2F4 !important;
-    color: #6B7280 !important;
-    border-radius: 999px;
-    padding: 2px 10px;
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-/* Divider above the Enabled Users KPI */
+/* Divider above the enabled users number */
 .aiedDivider {
-    border-top: 1px solid #F0F1F3;
+    border-top: 1px solid var(--aied-border-soft);
     padding-top: 16px;
     margin-top: 16px;
 }
 
-/* "28" — big blue KPI number */
+/* Big blue number */
 .aiedKpiValue {
     font-size: 36px;
     font-weight: 700;
-    color: #0057D8;
+    color: var(--aied-blue);
 }
 
-/* "Synced nightly via SCIM" — small muted note under the KPI label */
+/* Small note under the number */
 .aiedKpiNote {
     font-size: 12px;
-    color: #9AA1AB;
+    color: var(--aied-text-muted);
 }
 
-/* "View details →" link, bottom-right of the card */
+/* "View details" link */
 .aiedViewDetails {
     font-size: 13px;
     font-weight: 600;
-    color: #0057D8;
+    color: var(--aied-blue);
     text-align: right;
     display: block;
 }
 
 /* ═══════════════════════════════════════════════════════════════ */
-/* SIDE FILTER PANEL — matches the BTP Service Catalog reference    */
+/* FILTER PANEL (main page; the filter logic comes in phase 2)      */
 /* ═══════════════════════════════════════════════════════════════ */
 
-/* Panel shell: white background, right-hand separator from the grid */
+/* Panel shell: white background, separator from the grid */
 .aiedFilterPanel {
-    background: #FFFFFF;
-    border-right: 1px solid #E2E5E9;
+    background: var(--aied-surface);
+    border-right: 1px solid var(--aied-border);
     padding: 20px 16px;
     box-sizing: border-box;
     min-height: 100%;
     margin-right: 24px;
 }
 
-/* Section labels: "Search Catalog", "Solutions", "Commercial Models", etc. */
+/* Section titles: Status, Owner, Quick filters */
 .aiedFilterSectionTitle {
     font-size: 13px;
     font-weight: 600;
-    color: #556B82;
+    color: var(--aied-text-label);
     margin-top: 20px;
     margin-bottom: 10px;
     text-transform: none;
 }
-/* First section title sits right under the search field, less top gap */
+/* The first title sits right under the search field, so it needs less space above */
 .aiedFilterPanel > .aiedFilterSectionTitle:first-of-type {
     margin-top: 4px;
 }
 
-/* Consistent breathing room below each filter control before the next label */
+/* Space below each filter control before the next title */
 .aiedFilterSectionGap {
     margin-bottom: 4px;
 }
 
-/* Search field */
 .aiedFilterSearch {
     width: 100%;
     margin-bottom: 4px;
@@ -142,8 +141,7 @@
     border-radius: 6px;
 }
 
-/* Status facet list — borderless rows, selected row gets a left accent bar
-   and light blue fill, matching the "All" row highlighted in the screenshot */
+/* Status list: borderless rows; the selected row gets a blue bar on the left */
 .aiedFilterStatusList {
     background: transparent;
     border: none;
@@ -153,40 +151,35 @@
     padding: 6px 10px;
     border-radius: 4px;
     font-size: 14px;
-    color: #3A3F46;
+    color: var(--aied-text-body);
 }
 .aiedFilterStatusList .sapMLIB:hover {
-    background: #F5F6F7;
+    background: var(--aied-surface-hover);
 }
-/* Selected list item: blue left bar + light blue background + blue text */
 .aiedFilterStatusList .sapMLIBSelected {
-    background: #E8F2FE !important;
-    border-left: 3px solid #0057D8 !important;
+    background: var(--aied-blue-pale) !important;
+    border-left: 3px solid var(--aied-blue) !important;
     padding-left: 7px;
-    color: #0057D8 !important;
+    color: var(--aied-blue) !important;
     font-weight: 600;
 }
 .aiedFilterStatusList .sapMLIBSelected .sapMSLITitleOnly,
 .aiedFilterStatusList .sapMLIBSelected .sapMObjSLTitle {
-    color: #0057D8 !important;
+    color: var(--aied-blue) !important;
     font-weight: 600;
 }
 
-/* Owner dropdown — rounded, neutral border like "All - 6" in the reference */
+/* Owner dropdown */
 .aiedFilterSelect {
-    border: 1px solid #D5D9DD !important;
+    border: 1px solid var(--aied-border-input) !important;
     border-radius: 6px !important;
-    background: #FFFFFF;
+    background: var(--aied-surface);
 }
 
-/* Quick filter chips — outlined pill, filled blue when toggled on */
-.aiedQuickFilterChip .sapMBtnInner.sapMBtnText .sapMBtnIcon::before {
-    font-size: 14px;
-    font-weight: 600
-}
+/* The quick filter chip (.aiedQuickFilterChip) is styled in phase 2, together with its logic */
 
 /* ═══════════════════════════════════════════════════════════════ */
-/* SCREEN 2 — INITIATIVE DETAIL                                     */
+/* ANIMATION                                                        */
 /* ═══════════════════════════════════════════════════════════════ */
 
 @keyframes aiedFadeUp {
@@ -201,12 +194,16 @@
     .aiedAnimIn { animation: none; }
 }
 
-/* ── Header facts row ────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════ */
+/* DETAIL PAGE                                                      */
+/* ═══════════════════════════════════════════════════════════════ */
+
+/* ── Header facts (owner, IAS group, launch date, status) ───── */
 .aiedFactsRow { padding: 6px 0 12px; }
 .aiedFact { padding: 0 32px 0 0; }
 .aiedFactDivided {
     padding-left: 32px;
-    border-left: 1px solid #E2E5E9;
+    border-left: 1px solid var(--aied-border);
 }
 .aiedFactLabel {
     display: block;
@@ -215,23 +212,23 @@
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #8792A2;
+    color: var(--aied-text-muted);
 }
 .aiedFactValue {
     display: block;
     font-size: 15px;
     font-weight: 600;
-    color: #1A1A1A;
+    color: var(--aied-text);
 }
 .aiedCodeChip {
     display: inline-block;
     padding: 3px 9px;
     border-radius: 6px;
-    background: #F1F2F4;
+    background: var(--aied-surface-subtle);
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 13px;
     font-weight: 600;
-    color: #3A3F46;
+    color: var(--aied-text-body);
 }
 
 /* ── Page body ───────────────────────────────────────────────── */
@@ -243,7 +240,7 @@
     box-sizing: border-box;
 }
 
-/* ── KPI cards (clickable) ───────────────────────────────────── */
+/* ── KPI cards (clickable: they switch the user list) ────────── */
 .aiedKpiRow {
     display: grid !important;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -260,14 +257,14 @@
     box-sizing: border-box;
     min-height: 112px;
     padding: 22px 26px;
-    background: #FFFFFF;
-    border: 1px solid #E2E5E9;
+    background: var(--aied-surface);
+    border: 1px solid var(--aied-border);
     border-radius: 16px;
-    box-shadow: 0 1px 3px rgba(26, 26, 26, 0.05);
+    box-shadow: var(--aied-shadow);
     cursor: pointer;
     transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
-.aiedKpiCard::after {                       /* coloured top accent bar */
+.aiedKpiCard::after {                       /* coloured bar along the top */
     content: "";
     position: absolute;
     left: 0;
@@ -281,21 +278,21 @@
     box-shadow: 0 8px 22px rgba(0, 87, 216, 0.12);
 }
 .aiedKpiCard:focus-visible {
-    outline: 2px solid #0057D8;
+    outline: 2px solid var(--aied-blue);
     outline-offset: 2px;
 }
-.aiedKpiCardBlue  { --aied-accent: #0057D8; }
-.aiedKpiCardGreen { --aied-accent: #1A7F37; }
+.aiedKpiCardBlue  { --aied-accent: var(--aied-blue); }
+.aiedKpiCardGreen { --aied-accent: var(--aied-green); }
 
-/* Selected = the card whose list is currently shown */
+/* Selected = the card whose list is shown below (the controller adds this class) */
 .aiedKpiCardBlue.aiedKpiCardSelected {
-    background: #F5F9FF;
-    border-color: #0057D8;
+    background: var(--aied-blue-tint);
+    border-color: var(--aied-blue);
     box-shadow: 0 0 0 3px rgba(0, 87, 216, 0.18), 0 8px 22px rgba(0, 87, 216, 0.12);
 }
 .aiedKpiCardGreen.aiedKpiCardSelected {
-    background: #F4FBF6;
-    border-color: #1A7F37;
+    background: var(--aied-green-tint);
+    border-color: var(--aied-green);
     box-shadow: 0 0 0 3px rgba(26, 127, 55, 0.18), 0 8px 22px rgba(26, 127, 55, 0.12);
 }
 
@@ -306,10 +303,10 @@
     margin-right: 16px;
     border-radius: 14px;
 }
-.aiedKpiIconBlue  { background: #E8F2FE; }
-.aiedKpiIconBlue .sapUiIcon  { color: #0057D8 !important; }
-.aiedKpiIconGreen { background: #E6F4EA; }
-.aiedKpiIconGreen .sapUiIcon { color: #1A7F37 !important; }
+.aiedKpiIconBlue  { background: var(--aied-blue-pale); }
+.aiedKpiIconBlue .sapUiIcon  { color: var(--aied-blue) !important; }
+.aiedKpiIconGreen { background: var(--aied-green-pale); }
+.aiedKpiIconGreen .sapUiIcon { color: var(--aied-green) !important; }
 
 .aiedKpiLabel {
     display: block;
@@ -317,38 +314,32 @@
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #6B7280;
+    color: var(--aied-text-muted);
 }
 .aiedKpiCard .aiedKpiNote {
     display: block;
     margin-top: 4px;
     font-size: 12px;
-    color: #9AA1AB;
+    color: var(--aied-text-muted);
 }
 .aiedKpiCard .aiedKpiValue {
     margin: 0;
     font-size: 44px;
     font-weight: 700;
     line-height: 1.1;
-    color: #0057D8;
+    color: var(--aied-blue);
 }
-.aiedKpiCardGreen .aiedKpiValue { color: #1A7F37; }
-.aiedKpiHint {
-    margin-top: 4px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--aied-accent, #0057D8);
-}
+.aiedKpiCardGreen .aiedKpiValue { color: var(--aied-green); }
 
-/* ── Panels (chart + user list) ──────────────────────────────── */
+/* ── Panels (chart and user list) ────────────────────────────── */
 .aiedPanel {
     box-sizing: border-box;
     width: 100%;
     padding: 24px 28px;
-    background: #FFFFFF;
-    border: 1px solid #E2E5E9;
+    background: var(--aied-surface);
+    border: 1px solid var(--aied-border);
     border-radius: 16px;
-    box-shadow: 0 1px 3px rgba(26, 26, 26, 0.05);
+    box-shadow: var(--aied-shadow);
 }
 .aiedPanelSpaced {
     margin-top: 24px;
@@ -361,7 +352,7 @@
     padding-left: 14px;
     font-size: 17px;
     font-weight: 700;
-    color: #1A1A1A;
+    color: var(--aied-text);
 }
 .aiedSectionTitle::before {
     content: "";
@@ -371,61 +362,60 @@
     width: 4px;
     height: 17px;
     border-radius: 2px;
-    background: #0057D8;
+    background: var(--aied-blue);
 }
 .aiedSectionSub {
     display: block;
     margin-top: 2px;
     padding-left: 14px;
     font-size: 13px;
-    color: #6B7280;
+    color: var(--aied-text-muted);
 }
 .aiedCountChip {
     padding: 4px 12px;
     border-radius: 999px;
-    background: #E8F2FE;
+    background: var(--aied-blue-pale);
     font-size: 12px;
     font-weight: 700;
-    color: #0057D8;
+    color: var(--aied-blue);
 }
 
 /* ── Empty state ─────────────────────────────────────────────── */
 .aiedEmptyState {
     padding: 52px 16px;
-    background: #FBFBFC;
-    border: 2px dashed #D5D9DD;
+    background: var(--aied-surface-empty);
+    border: 2px dashed var(--aied-border-input);
     border-radius: 12px;
     text-align: center;
 }
-.aiedEmptyIcon  { color: #9AA1AB !important; }
-.aiedEmptyTitle { font-size: 15px; font-weight: 600; color: #3A3F46; }
-.aiedEmptyText  { font-size: 13px; color: #6B7280; }
-
-/* ── Masking note ────────────────────────────────────────────── */
-.aiedMaskStrip { border-radius: 10px; }
+.aiedEmptyIcon  { color: var(--aied-text-muted) !important; }
+.aiedEmptyTitle { font-size: 15px; font-weight: 600; color: var(--aied-text-body); }
+.aiedEmptyText  { font-size: 13px; color: var(--aied-text-muted); }
 
 /* ── User table ──────────────────────────────────────────────── */
 .aiedUserTable {
-    border: 1px solid #E2E5E9;
+    border: 1px solid var(--aied-border);
     border-radius: 12px;
     overflow: hidden;
 }
 .aiedUserTable .sapMListTblHeaderCell {
-    background: #F8F9FA;
-    border-bottom: 1px solid #E2E5E9;
+    background: var(--aied-surface-table);
+    border-bottom: 1px solid var(--aied-border);
     font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: #6B7280;
+    color: var(--aied-text-muted);
 }
-.aiedUserTable .sapMLIB:hover { background: #F5F9FF; }
-.aiedUserName  { font-size: 14px; font-weight: 600; color: #1A1A1A; }
-.aiedUserEmail { font-size: 13px; color: #6B7280; }
-.aiedDateText  { font-size: 13px; color: #3A3F46; }
+.aiedUserTable .sapMLIB:hover { background: var(--aied-blue-tint); }
+.aiedUserName  { font-size: 14px; font-weight: 600; color: var(--aied-text); }
+.aiedUserEmail { font-size: 13px; color: var(--aied-text-muted); }
+.aiedDateText  { font-size: 13px; color: var(--aied-text-body); }
 
-/* ── SCREEN 3: USER DRILL-DOWN ─────────────────────────── */
-/* ── SCREEN 3: USER DRILL-DOWN ─────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════ */
+/* USER DETAIL PAGE                                                 */
+/* ═══════════════════════════════════════════════════════════════ */
+
 .aiedStatRow {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -436,8 +426,8 @@
 @media (max-width: 520px)  { .aiedStatRow { grid-template-columns: 1fr; } }
 
 .aiedStatCard {
-    background: #fff;
-    border: 1px solid #E2E5E9;
+    background: var(--aied-surface);
+    border: 1px solid var(--aied-border);
     border-radius: 12px;
     padding: 20px 24px;
 }
@@ -445,21 +435,21 @@
     font-size: 1.75rem;
     font-weight: 700;
     line-height: 1.2;
-    color: #1D2D3E;
+    color: var(--aied-text-stat);
     margin-top: 6px;
     display: block;
 }
-
 .aiedStatNote {
     display: block;
     font-size: 0.8125rem;
-    color: #6A6D70;
+    color: var(--aied-text-muted);
     margin-top: 6px;
 }
 .aiedStatProgress {
     margin-top: 10px;
 }
 
+/* Activity strip: one row per month (or year), one box per period */
 .aiedLegend {
     gap: 12px;
     margin-bottom: 16px;
@@ -473,7 +463,7 @@
 .aiedGroupTitle {
     flex: 0 0 5.5rem;
     font-size: 0.8125rem;
-    color: #6A6D70;
+    color: var(--aied-text-muted);
 }
 .aiedStrip {
     display: flex;

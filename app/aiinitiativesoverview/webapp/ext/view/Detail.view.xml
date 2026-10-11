@@ -30,7 +30,7 @@
                     <Text id="factOwnerLabel" text="{i18n>detail_fact_owner}" class="aiedFactLabel" />
                     <Text
                         id="factOwnerValue"
-                        text="{= ${detailModel>/owner} || 'TBD' }"
+                        text="{= ${detailModel>/owner} || ${i18n>detail_fact_tbd} }"
                         class="aiedFactValue" />
                 </VBox>
 
@@ -46,7 +46,7 @@
                     id="factLaunch"
                     renderType="Bare"
                     class="aiedFact aiedFactDivided"
-                    visible="{= ${detailModel>/statusCriticality} === 3 }">
+                    visible="{path: 'detailModel>/status', formatter: '.formatter.isLive'}">
                     <Text id="factLaunchLabel" text="{i18n>detail_fact_launch}" class="aiedFactLabel" />
                     <Text
                         id="factLaunchValue"
@@ -62,9 +62,9 @@
                     <Text id="factStatusLabel" text="{i18n>detail_fact_status}" class="aiedFactLabel" />
                     <ObjectStatus
                         id="detailStatus"
-                        text="{detailModel>/status}"
+                        text="{path: 'detailModel>/status', formatter: '.formatter.statusText'}"
                         inverted="true"
-                        state="{= ${detailModel>/statusCriticality} === 3 ? 'Indication16' : 'Indication13' }" />
+                        state="{path: 'detailModel>/status', formatter: '.formatter.statusState'}" />
                 </VBox>
             </HBox>
         </macros:headerContent>
@@ -161,6 +161,7 @@
                                 text="{i18n>usage_trend_sub}"
                                 class="aiedSectionSub" />
                         </VBox>
+                        <!-- The keys are the grains the service accepts (see constants.js) -->
                         <SegmentedButton
                             id="grainToggle"
                             selectedKey="MONTHLY"
@@ -173,6 +174,7 @@
                         </SegmentedButton>
                     </FlexBox>
 
+                    <!-- The dimension name "Period" is read in the controller (CHART_PERIOD_DIMENSION) -->
                     <viz:VizFrame
                         id="trendChart"
                         uiConfig="{applicationSet:'fiori'}"
@@ -180,7 +182,6 @@
                         height="340px"
                         width="100%"
                         selectData=".onTrendSelect"
-                        deselectData=".onTrendDeselect"
                         visible="{= ${trendModel>/results}.length > 0 }"
                         vizProperties="{plotArea:{dataLabel:{visible:true}, colorPalette:['#0057D8'], marker:{visible:true, size:8}}, interaction:{selectability:{mode:'EXCLUSIVE'}}, title:{visible:false}}">
                         <viz:dataset>
